@@ -59,6 +59,9 @@ export default function POSPage() {
 
   const fetchProducts = async () => {
     try {
+      if (!supabase) {
+        throw new Error("Supabase client is not initialized")
+      }
       const { data, error } = await supabase
         .from("productos")
         .select("id, nombre, precio, stock, tipo")
@@ -101,7 +104,7 @@ export default function POSPage() {
     }
 
     const product = products.find((p) => p.id === productId)
-    if (product?.stock !== null && newQuantity > product.stock) {
+    if (product && product.stock !== null && newQuantity > product.stock) {
       toast({
         title: "Stock insuficiente",
         description: "No hay suficiente stock disponible",
@@ -142,6 +145,15 @@ export default function POSPage() {
       return
     }
 
+    if (!supabase) {
+      toast({
+        title: "Error",
+        description: "Supabase client is not initialized",
+        variant: "destructive",
+      })
+      return
+    }
+
     setProcessing(true)
 
     try {
@@ -158,10 +170,23 @@ export default function POSPage() {
         if (error) throw error
 
         // Actualizar stock
+        const { data: currentProduct, error: fetchError } = await supabase
+          .from("productos")
+          .select("stock")
+          .eq("id", item.product.id)
+          .single()
+
+        if (fetchError) throw fetchError
+
+        const newStock =
+          currentProduct && currentProduct.stock !== null
+            ? Math.max(currentProduct.stock - item.quantity, 0)
+            : null
+
         await supabase
           .from("productos")
           .update({
-            stock: supabase.raw(`stock - ${item.quantity}`),
+            stock: newStock,
           })
           .eq("id", item.product.id)
       }

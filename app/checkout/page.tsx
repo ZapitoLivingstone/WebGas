@@ -15,10 +15,11 @@ import { useCart } from "@/hooks/use-cart"
 import { useToast } from "@/hooks/use-toast"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
+import { supabase } from "@/components/providers/auth-provider"
 
 export default function CheckoutPage() {
   const { user } = useAuth()
-  const { cartItems, getCartTotal, loading } = useCart()
+  const { cartItems, getCartTotal, loading, clearCart } = useCart()
   const { toast } = useToast()
   const router = useRouter()
 
@@ -27,6 +28,11 @@ export default function CheckoutPage() {
     payment_method: "",
   })
   const [processing, setProcessing] = useState(false)
+  const [errors, setErrors] = useState<{
+    shipping_address?: string
+    payment_method?: string
+    general?: string
+  }>({})
 
   useEffect(() => {
     if (!user && !loading) {
@@ -44,35 +50,119 @@ export default function CheckoutPage() {
     }).format(price)
   }
 
+  const validateForm = () => {
+    const newErrors: {
+      shipping_address?: string
+      payment_method?: string
+    } = {}
+
+    if (!formData.shipping_address.trim()) {
+      newErrors.shipping_address = "La dirección de envío es requerida"
+    }
+
+    if (!formData.payment_method) {
+      newErrors.payment_method = "Selecciona un método de pago"
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const createOrder = async () => {
+    if (!user || !supabase) throw new Error("Usuario no autenticado")
+
+    const items = cartItems.map((item) => ({
+      producto_id: item.product_id,
+      cantidad: item.quantity,
+      precio: item.product.precio,
+      tipo: item.product.tipo,
+    }))
+
+    const total = getCartTotal()
+
+    // Crear pedido
+    const { data: order, error: orderError } = await supabase
+      .from("pedidos")
+      .insert({
+        usuario_id: user.id,
+        tipo_pago: formData.payment_method,
+        envio_direccion: formData.shipping_address,
+        total: total,
+        estado: "pendiente",
+      })
+      .select()
+      .single()
+
+    if (orderError) throw orderError
+
+    // Crear detalles del pedido
+    const orderDetails = items.map((item) => ({
+      pedido_id: order.id,
+      producto_id: item.producto_id,
+      cantidad: item.cantidad,
+      precio_unitario: item.precio,
+      tipo_producto: item.tipo,
+    }))
+
+    const { error: detailsError } = await supabase.from("detalle_pedido").insert(orderDetails)
+
+    if (detailsError) throw detailsError
+
+    // Crear notificaciones para productos dropshipping
+    const dropshippingItems = items.filter((item) => item.tipo === "dropshipping")
+
+    if (dropshippingItems.length > 0) {
+      const { data: distributors } = await supabase.from("usuarios").select("id").eq("rol", "distribuidor").limit(1)
+
+      if (distributors && distributors.length > 0) {
+        const notifications = dropshippingItems.map((item) => ({
+          pedido_id: order.id,
+          producto_id: item.producto_id,
+          distribuidor_id: distributors[0].id,
+          estado: "pendiente",
+        }))
+
+        await supabase.from("notificaciones_distribuidor").insert(notifications)
+      }
+    }
+
+    // Actualizar stock para productos propios
+    for (const item of items.filter((i) => i.tipo === "propio")) {
+      // Obtener el stock actual
+      const { data: producto, error: productoError } = await supabase
+        .from("productos")
+        .select("stock")
+        .eq("id", item.producto_id)
+        .single()
+
+      if (productoError) throw productoError
+
+      const nuevoStock = (producto?.stock ?? 0) - item.cantidad
+
+      await supabase
+        .from("productos")
+        .update({
+          stock: nuevoStock,
+        })
+        .eq("id", item.producto_id)
+    }
+
+    return order
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setErrors({})
+
+    if (!validateForm()) return
+
     setProcessing(true)
 
     try {
-      const orderData = {
-        items: cartItems.map((item) => ({
-          producto_id: item.product_id,
-          cantidad: item.quantity,
-          precio: item.product.precio,
-          tipo: item.product.tipo,
-        })),
-        shipping_address: formData.shipping_address,
-        payment_method: formData.payment_method,
-      }
+      const order = await createOrder()
 
-      const response = await fetch("/api/orders", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(orderData),
-      })
-
-      if (!response.ok) {
-        throw new Error("Error al procesar el pedido")
-      }
-
-      const { order } = await response.json()
+      // Limpiar carrito
+      await clearCart()
 
       toast({
         title: "Pedido creado exitosamente",
@@ -80,12 +170,9 @@ export default function CheckoutPage() {
       })
 
       router.push(`/orders/${order.id}`)
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo procesar el pedido",
-        variant: "destructive",
-      })
+    } catch (error: any) {
+      console.error("Error creating order:", error)
+      setErrors({ general: "No se pudo procesar el pedido. Intenta nuevamente." })
     } finally {
       setProcessing(false)
     }
@@ -117,6 +204,12 @@ export default function CheckoutPage() {
           {/* Checkout Form */}
           <div>
             <form onSubmit={handleSubmit} className="space-y-6">
+              {errors.general && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+                  {errors.general}
+                </div>
+              )}
+
               <Card>
                 <CardHeader>
                   <CardTitle>Información de Envío</CardTitle>
@@ -128,10 +221,11 @@ export default function CheckoutPage() {
                       id="shipping_address"
                       value={formData.shipping_address}
                       onChange={(e) => setFormData((prev) => ({ ...prev, shipping_address: e.target.value }))}
-                      required
                       placeholder="Ingresa tu dirección completa"
                       rows={3}
+                      className={errors.shipping_address ? "border-red-500" : ""}
                     />
+                    {errors.shipping_address && <p className="text-red-500 text-sm mt-1">{errors.shipping_address}</p>}
                   </div>
                 </CardContent>
               </Card>
@@ -146,9 +240,8 @@ export default function CheckoutPage() {
                     <Select
                       value={formData.payment_method}
                       onValueChange={(value) => setFormData((prev) => ({ ...prev, payment_method: value }))}
-                      required
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className={errors.payment_method ? "border-red-500" : ""}>
                         <SelectValue placeholder="Selecciona método de pago" />
                       </SelectTrigger>
                       <SelectContent>
@@ -157,6 +250,7 @@ export default function CheckoutPage() {
                         <SelectItem value="tarjeta">Tarjeta de Crédito/Débito</SelectItem>
                       </SelectContent>
                     </Select>
+                    {errors.payment_method && <p className="text-red-500 text-sm mt-1">{errors.payment_method}</p>}
                   </div>
                 </CardContent>
               </Card>

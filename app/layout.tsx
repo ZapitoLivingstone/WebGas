@@ -10,7 +10,6 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Gásfiter Pro - Tu tienda de plomería online",
   description: "Encuentra todo lo que necesitas para tus proyectos de plomería y gasfitería",
-    generator: 'v0.dev'
 }
 
 export default function RootLayout({
