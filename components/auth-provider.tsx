@@ -25,6 +25,7 @@ interface AuthContextType {
   loading: boolean
   signOut: () => Promise<void>
   isConfigured: boolean
+  refreshAuth: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -33,61 +34,119 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   signOut: async () => {},
   isConfigured: false,
+  refreshAuth: async () => {},
 })
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [initialized, setInitialized] = useState(false)
   const isConfigured = !!supabase
+
+  const getUserRole = async (userId: string) => {
+    if (!supabase) return null
+
+    try {
+      const { data: userData, error } = await supabase.from("usuarios").select("rol").eq("id", userId).single()
+
+      if (error) {
+        console.error("Error fetching user role:", error)
+        return null
+      }
+
+      return userData?.rol || null
+    } catch (error) {
+      console.error("Error in getUserRole:", error)
+      return null
+    }
+  }
+
+  const refreshAuth = async () => {
+    if (!supabase) return
+
+    try {
+      const {
+        data: { user: currentUser },
+      } = await supabase.auth.getUser()
+
+      setUser(currentUser)
+
+      if (currentUser) {
+        const role = await getUserRole(currentUser.id)
+        setUserRole(role)
+        console.log("Auth refreshed - User:", currentUser.email, "Role:", role)
+      } else {
+        setUserRole(null)
+      }
+    } catch (error) {
+      console.error("Error refreshing auth:", error)
+      setUser(null)
+      setUserRole(null)
+    }
+  }
 
   useEffect(() => {
     if (!supabase) {
       setLoading(false)
+      setInitialized(true)
       return
     }
 
-    const getUser = async () => {
+    const initializeAuth = async () => {
       try {
+        // Obtener usuario actual
         const {
-          data: { user },
+          data: { user: currentUser },
         } = await supabase.auth.getUser()
-        setUser(user)
 
-        if (user) {
-          // Obtener el rol del usuario desde la tabla usuarios
-          const { data: userData } = await supabase.from("usuarios").select("rol").eq("id", user.id).single()
+        console.log("Initializing auth - User:", currentUser?.email)
 
-          setUserRole(userData?.rol || null)
+        setUser(currentUser)
+
+        if (currentUser) {
+          const role = await getUserRole(currentUser.id)
+          setUserRole(role)
+          console.log("Initial auth - User:", currentUser.email, "Role:", role)
+        } else {
+          setUserRole(null)
         }
       } catch (error) {
-        console.error("Error getting user:", error)
+        console.error("Error initializing auth:", error)
+        setUser(null)
+        setUserRole(null)
       } finally {
         setLoading(false)
+        setInitialized(true)
       }
     }
 
-    getUser()
+    initializeAuth()
 
+    // Escuchar cambios de autenticación
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setUser(session?.user || null)
+      console.log("Auth state changed:", event, session?.user?.email)
 
-      if (session?.user) {
-        try {
-          const { data: userData } = await supabase.from("usuarios").select("rol").eq("id", session.user.id).single()
-
-          setUserRole(userData?.rol || null)
-        } catch (error) {
-          console.error("Error getting user role:", error)
-          setUserRole(null)
-        }
-      } else {
+      if (event === "SIGNED_OUT") {
+        setUser(null)
         setUserRole(null)
+        return
       }
 
-      setLoading(false)
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        const currentUser = session?.user || null
+        setUser(currentUser)
+
+        if (currentUser) {
+          const role = await getUserRole(currentUser.id)
+          setUserRole(role)
+          console.log("Auth event - User:", currentUser.email, "Role:", role)
+        } else {
+          setUserRole(null)
+        }
+      }
     })
 
     return () => subscription.unsubscribe()
@@ -97,16 +156,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!supabase) return
 
     try {
-      await supabase.auth.signOut()
+      setLoading(true)
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+
+      // Limpiar estado inmediatamente
       setUser(null)
       setUserRole(null)
+
+      // Recargar la página para limpiar completamente el estado
+      window.location.href = "/"
     } catch (error) {
       console.error("Error signing out:", error)
+      throw error
+    } finally {
+      setLoading(false)
     }
   }
 
+  // No renderizar hasta que la autenticación esté inicializada
+  if (!initialized) {
+    return <div>Cargando...</div>
+  }
+
   return (
-    <AuthContext.Provider value={{ user, userRole, loading, signOut, isConfigured }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ user, userRole, loading, signOut, isConfigured, refreshAuth }}>
+      {children}
+    </AuthContext.Provider>
   )
 }
 

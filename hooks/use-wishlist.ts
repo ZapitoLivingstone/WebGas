@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { supabase } from "@/components/providers/auth-provider"
 import { useAuth } from "@/components/providers/auth-provider"
 
@@ -23,23 +23,13 @@ export function useWishlist() {
   const [loading, setLoading] = useState(true)
   const { user, isConfigured } = useAuth()
 
-  useEffect(() => {
-    if (!isConfigured) {
-      setLoading(false)
-      return
-    }
-
-    if (user) {
-      fetchWishlistItems()
-    } else {
+  const fetchWishlistItems = useCallback(async () => {
+    if (!user || !supabase) {
       setWishlistItems([])
       setWishlistCount(0)
       setLoading(false)
+      return
     }
-  }, [user, isConfigured])
-
-  const fetchWishlistItems = async () => {
-    if (!user || !supabase) return
 
     try {
       const { data, error } = await supabase
@@ -60,14 +50,24 @@ export function useWishlist() {
 
       if (error) throw error
 
-      setWishlistItems(data || [])
-      setWishlistCount(data?.length || 0)
+      const items = data || []
+      setWishlistItems(items)
+      setWishlistCount(items.length)
     } catch (error) {
       console.error("Error fetching wishlist items:", error)
     } finally {
       setLoading(false)
     }
-  }
+  }, [user])
+
+  useEffect(() => {
+    if (!isConfigured) {
+      setLoading(false)
+      return
+    }
+
+    fetchWishlistItems()
+  }, [user, isConfigured, fetchWishlistItems])
 
   const addToWishlist = async (productId: number) => {
     if (!user || !supabase) throw new Error("User not authenticated or Supabase not configured")
@@ -80,6 +80,7 @@ export function useWishlist() {
 
       if (error) throw error
 
+      // Actualizar inmediatamente el estado local
       await fetchWishlistItems()
     } catch (error) {
       console.error("Error adding to wishlist:", error)
@@ -95,6 +96,7 @@ export function useWishlist() {
 
       if (error) throw error
 
+      // Actualizar inmediatamente el estado local
       await fetchWishlistItems()
     } catch (error) {
       console.error("Error removing from wishlist:", error)

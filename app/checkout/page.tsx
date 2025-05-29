@@ -128,21 +128,10 @@ export default function CheckoutPage() {
 
     // Actualizar stock para productos propios
     for (const item of items.filter((i) => i.tipo === "propio")) {
-      // Obtener el stock actual
-      const { data: producto, error: productoError } = await supabase
-        .from("productos")
-        .select("stock")
-        .eq("id", item.producto_id)
-        .single()
-
-      if (productoError) throw productoError
-
-      const nuevoStock = (producto?.stock ?? 0) - item.cantidad
-
       await supabase
         .from("productos")
         .update({
-          stock: nuevoStock,
+          stock: supabase.raw(`stock - ${item.cantidad}`),
         })
         .eq("id", item.producto_id)
     }

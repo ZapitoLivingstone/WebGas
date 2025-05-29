@@ -84,16 +84,7 @@ export default function DistributorPage() {
         .order("fecha_envio", { ascending: false })
 
       if (error) throw error
-      setNotifications(
-        (data || []).map((n: any) => ({
-          ...n,
-          pedido: Array.isArray(n.pedido) ? {
-            ...n.pedido[0],
-            usuario: Array.isArray(n.pedido[0]?.usuario) ? n.pedido[0]?.usuario[0] : n.pedido[0]?.usuario
-          } : n.pedido,
-          producto: Array.isArray(n.producto) ? n.producto[0] : n.producto
-        }))
-      )
+      setNotifications(data || [])
     } catch (error) {
       console.error("Error fetching notifications:", error)
     }

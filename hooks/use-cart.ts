@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { supabase } from "@/components/providers/auth-provider"
 import { useAuth } from "@/components/providers/auth-provider"
 
@@ -23,23 +23,13 @@ export function useCart() {
   const [loading, setLoading] = useState(true)
   const { user, isConfigured } = useAuth()
 
-  useEffect(() => {
-    if (!isConfigured) {
-      setLoading(false)
-      return
-    }
-
-    if (user) {
-      fetchCartItems()
-    } else {
+  const fetchCartItems = useCallback(async () => {
+    if (!user || !supabase) {
       setCartItems([])
       setCartCount(0)
       setLoading(false)
+      return
     }
-  }, [user, isConfigured])
-
-  const fetchCartItems = async () => {
-    if (!user || !supabase) return
 
     try {
       const { data, error } = await supabase
@@ -60,14 +50,24 @@ export function useCart() {
 
       if (error) throw error
 
-      setCartItems(data || [])
-      setCartCount(data?.reduce((sum, item) => sum + item.quantity, 0) || 0)
+      const items = data || []
+      setCartItems(items)
+      setCartCount(items.reduce((sum, item) => sum + item.quantity, 0))
     } catch (error) {
       console.error("Error fetching cart items:", error)
     } finally {
       setLoading(false)
     }
-  }
+  }, [user])
+
+  useEffect(() => {
+    if (!isConfigured) {
+      setLoading(false)
+      return
+    }
+
+    fetchCartItems()
+  }, [user, isConfigured, fetchCartItems])
 
   const addToCart = async (productId: number, quantity = 1) => {
     if (!user || !supabase) throw new Error("User not authenticated or Supabase not configured")
@@ -101,6 +101,7 @@ export function useCart() {
         if (error) throw error
       }
 
+      // Actualizar inmediatamente el estado local
       await fetchCartItems()
     } catch (error) {
       console.error("Error adding to cart:", error)
@@ -125,6 +126,7 @@ export function useCart() {
 
       if (error) throw error
 
+      // Actualizar inmediatamente el estado local
       await fetchCartItems()
     } catch (error) {
       console.error("Error updating quantity:", error)
@@ -140,6 +142,7 @@ export function useCart() {
 
       if (error) throw error
 
+      // Actualizar inmediatamente el estado local
       await fetchCartItems()
     } catch (error) {
       console.error("Error removing from cart:", error)

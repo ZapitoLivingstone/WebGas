@@ -19,7 +19,7 @@ import { useCart } from "@/hooks/use-cart"
 import { useWishlist } from "@/hooks/use-wishlist"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 export function Header() {
   const { user, userRole, signOut, isConfigured } = useAuth()
@@ -28,6 +28,17 @@ export function Header() {
   const router = useRouter()
   const { toast } = useToast()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [displayCartCount, setDisplayCartCount] = useState(0)
+  const [displayWishlistCount, setDisplayWishlistCount] = useState(0)
+
+  // Actualizar contadores con animación
+  useEffect(() => {
+    setDisplayCartCount(cartCount)
+  }, [cartCount])
+
+  useEffect(() => {
+    setDisplayWishlistCount(wishlistCount)
+  }, [wishlistCount])
 
   const handleSignOut = async () => {
     try {
@@ -37,8 +48,6 @@ export function Header() {
         title: "Sesión cerrada",
         description: "Has cerrado sesión exitosamente",
       })
-      router.push("/")
-      router.refresh()
     } catch (error) {
       console.error("Error signing out:", error)
       toast({
@@ -88,9 +97,9 @@ export function Header() {
                 <Link href="/wishlist">
                   <Button variant="ghost" size="sm" className="relative">
                     <Heart className="h-5 w-5" />
-                    {wishlistCount > 0 && (
-                      <Badge className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
-                        {wishlistCount}
+                    {displayWishlistCount > 0 && (
+                      <Badge className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs animate-pulse">
+                        {displayWishlistCount}
                       </Badge>
                     )}
                   </Button>
@@ -100,9 +109,9 @@ export function Header() {
                 <Link href="/cart">
                   <Button variant="ghost" size="sm" className="relative">
                     <ShoppingCart className="h-5 w-5" />
-                    {cartCount > 0 && (
-                      <Badge className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
-                        {cartCount}
+                    {displayCartCount > 0 && (
+                      <Badge className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs animate-pulse">
+                        {displayCartCount}
                       </Badge>
                     )}
                   </Button>
@@ -113,6 +122,9 @@ export function Header() {
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm">
                       <User className="h-5 w-5" />
+                      {userRole && (
+                        <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">{userRole}</span>
+                      )}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">

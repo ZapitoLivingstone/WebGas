@@ -1,20 +1,16 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { supabase } from "@/components/providers/auth-provider"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { useAuth } from "@/components/providers/auth-provider"
 import { useToast } from "@/hooks/use-toast"
-import { Header } from "@/components/layout/header"
-import { Footer } from "@/components/layout/footer"
-import { Search, Plus, Minus, Trash2 } from "lucide-react"
+import { supabase } from "@/components/providers/auth-provider"
+import { useAuth } from "@/components/providers/auth-provider"
+import { Search, Plus, Minus, Trash2, ShoppingCart } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface Product {
   id: number
@@ -22,115 +18,121 @@ interface Product {
   precio: number
   stock: number | null
   tipo: string
+  imagen_url: string
 }
 
-interface POSItem {
+interface CartItem {
   product: Product
   quantity: number
 }
 
 export default function POSPage() {
-  const { user, userRole, loading } = useAuth()
-  const [products, setProducts] = useState<Product[]>([])
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
-  const [searchTerm, setSearchTerm] = useState("")
-  const [posItems, setPosItems] = useState<POSItem[]>([])
-  const [paymentMethod, setPaymentMethod] = useState("")
-  const [processing, setProcessing] = useState(false)
-  const router = useRouter()
+  const { user, userRole } = useAuth()
   const { toast } = useToast()
+  const [products, setProducts] = useState<Product[]>([])
+  const [cart, setCart] = useState<CartItem[]>([])
+  const [searchTerm, setSearchTerm] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [processingOrder, setProcessingOrder] = useState(false)
+  const [paymentMethod, setPaymentMethod] = useState("")
+  const [customerInfo, setCustomerInfo] = useState({
+    nombre: "",
+    email: "",
+    telefono: "",
+  })
 
   useEffect(() => {
-    if (!loading && (!user || userRole !== "admin")) {
-      router.push("/")
+    if (userRole !== "admin") {
+      toast({
+        title: "Acceso denegado",
+        description: "No tienes permisos para acceder al punto de venta",
+        variant: "destructive",
+      })
+      return
     }
-  }, [user, userRole, loading, router])
-
-  useEffect(() => {
-    if (user && userRole === "admin") {
-      fetchProducts()
-    }
-  }, [user, userRole])
-
-  useEffect(() => {
-    const filtered = products.filter((product) => product.nombre.toLowerCase().includes(searchTerm.toLowerCase()))
-    setFilteredProducts(filtered)
-  }, [searchTerm, products])
+    fetchProducts()
+  }, [userRole])
 
   const fetchProducts = async () => {
+    if (!supabase) return
+
     try {
-      if (!supabase) {
-        throw new Error("Supabase client is not initialized")
-      }
-      const { data, error } = await supabase
-        .from("productos")
-        .select("id, nombre, precio, stock, tipo")
-        .eq("activo", true)
-        .eq("tipo", "propio") // Solo productos propios para POS
+      const { data, error } = await supabase.from("productos").select("*").eq("activo", true).order("nombre")
 
       if (error) throw error
       setProducts(data || [])
-      setFilteredProducts(data || [])
     } catch (error) {
       console.error("Error fetching products:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los productos",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
     }
   }
 
-  const addToPOS = (product: Product) => {
-    const existingItem = posItems.find((item) => item.product.id === product.id)
+  const filteredProducts = products.filter((product) => product.nombre.toLowerCase().includes(searchTerm.toLowerCase()))
+
+  const addToCart = (product: Product) => {
+    const existingItem = cart.find((item) => item.product.id === product.id)
 
     if (existingItem) {
-      if (product.stock !== null && existingItem.quantity >= product.stock) {
-        toast({
-          title: "Stock insuficiente",
-          description: "No hay más stock disponible",
-          variant: "destructive",
-        })
-        return
+      if (product.tipo === "propio" && product.stock !== null) {
+        if (existingItem.quantity >= product.stock) {
+          toast({
+            title: "Stock insuficiente",
+            description: `Solo hay ${product.stock} unidades disponibles`,
+            variant: "destructive",
+          })
+          return
+        }
       }
 
-      setPosItems((prev) =>
-        prev.map((item) => (item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item)),
-      )
+      setCart(cart.map((item) => (item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item)))
     } else {
-      setPosItems((prev) => [...prev, { product, quantity: 1 }])
+      setCart([...cart, { product, quantity: 1 }])
     }
+
+    toast({
+      title: "Producto agregado",
+      description: `${product.nombre} agregado al carrito`,
+    })
   }
 
   const updateQuantity = (productId: number, newQuantity: number) => {
     if (newQuantity <= 0) {
-      removeFromPOS(productId)
+      removeFromCart(productId)
       return
     }
 
     const product = products.find((p) => p.id === productId)
-    if (product && product.stock !== null && newQuantity > product.stock) {
+    if (product?.tipo === "propio" && product.stock !== null && newQuantity > product.stock) {
       toast({
         title: "Stock insuficiente",
-        description: "No hay suficiente stock disponible",
+        description: `Solo hay ${product.stock} unidades disponibles`,
         variant: "destructive",
       })
       return
     }
 
-    setPosItems((prev) =>
-      prev.map((item) => (item.product.id === productId ? { ...item, quantity: newQuantity } : item)),
-    )
+    setCart(cart.map((item) => (item.product.id === productId ? { ...item, quantity: newQuantity } : item)))
   }
 
-  const removeFromPOS = (productId: number) => {
-    setPosItems((prev) => prev.filter((item) => item.product.id !== productId))
+  const removeFromCart = (productId: number) => {
+    setCart(cart.filter((item) => item.product.id !== productId))
   }
 
   const getTotal = () => {
-    return posItems.reduce((total, item) => total + item.product.precio * item.quantity, 0)
+    return cart.reduce((total, item) => total + item.product.precio * item.quantity, 0)
   }
 
-  const processSale = async () => {
-    if (posItems.length === 0) {
+  const processOrder = async () => {
+    if (cart.length === 0) {
       toast({
-        title: "Error",
-        description: "Agrega productos a la venta",
+        title: "Carrito vacío",
+        description: "Agrega productos al carrito antes de procesar la venta",
         variant: "destructive",
       })
       return
@@ -138,79 +140,90 @@ export default function POSPage() {
 
     if (!paymentMethod) {
       toast({
-        title: "Error",
+        title: "Método de pago requerido",
         description: "Selecciona un método de pago",
         variant: "destructive",
       })
       return
     }
 
-    if (!supabase) {
+    if (!customerInfo.nombre) {
       toast({
-        title: "Error",
-        description: "Supabase client is not initialized",
+        title: "Información del cliente requerida",
+        description: "Ingresa al menos el nombre del cliente",
         variant: "destructive",
       })
       return
     }
 
-    setProcessing(true)
+    setProcessingOrder(true)
 
     try {
-      // Registrar cada producto vendido en ventas_pos
-      for (const item of posItems) {
-        const { error } = await supabase.from("ventas_pos").insert({
-          admin_id: user?.id,
-          producto_id: item.product.id,
-          cantidad: item.quantity,
-          precio_unitario: item.product.precio,
+      if (!supabase || !user) throw new Error("No hay conexión a la base de datos")
+
+      // Crear la orden
+      const { data: orderData, error: orderError } = await supabase
+        .from("orders")
+        .insert({
+          user_id: user.id,
+          total: getTotal(),
+          estado: "completado",
           metodo_pago: paymentMethod,
+          direccion_envio: "Venta en tienda",
+          cliente_nombre: customerInfo.nombre,
+          cliente_email: customerInfo.email || null,
+          cliente_telefono: customerInfo.telefono || null,
         })
+        .select()
+        .single()
 
-        if (error) throw error
+      if (orderError) throw orderError
 
-        // Actualizar stock
-        const { data: currentProduct, error: fetchError } = await supabase
-          .from("productos")
-          .select("stock")
-          .eq("id", item.product.id)
-          .single()
+      // Crear los items de la orden
+      const orderItems = cart.map((item) => ({
+        order_id: orderData.id,
+        product_id: item.product.id,
+        quantity: item.quantity,
+        price: item.product.precio,
+      }))
 
-        if (fetchError) throw fetchError
+      const { error: itemsError } = await supabase.from("order_items").insert(orderItems)
 
-        const newStock =
-          currentProduct && currentProduct.stock !== null
-            ? Math.max(currentProduct.stock - item.quantity, 0)
-            : null
+      if (itemsError) throw itemsError
 
-        await supabase
-          .from("productos")
-          .update({
-            stock: newStock,
-          })
-          .eq("id", item.product.id)
+      // Actualizar stock para productos propios
+      for (const item of cart) {
+        if (item.product.tipo === "propio" && item.product.stock !== null) {
+          const { error: stockError } = await supabase
+            .from("productos")
+            .update({ stock: item.product.stock - item.quantity })
+            .eq("id", item.product.id)
+
+          if (stockError) throw stockError
+        }
       }
 
       toast({
         title: "Venta procesada",
-        description: "La venta se registró exitosamente",
+        description: `Orden #${orderData.id} creada exitosamente`,
       })
 
-      // Limpiar POS
-      setPosItems([])
+      // Limpiar carrito y formulario
+      setCart([])
+      setCustomerInfo({ nombre: "", email: "", telefono: "" })
       setPaymentMethod("")
 
-      // Actualizar productos para reflejar nuevo stock
-      await fetchProducts()
+      // Recargar productos para actualizar stock
+      fetchProducts()
     } catch (error) {
-      console.error("Error processing sale:", error)
+      console.error("Error processing order:", error)
       toast({
         title: "Error",
         description: "No se pudo procesar la venta",
         variant: "destructive",
       })
     } finally {
-      setProcessing(false)
+      setProcessingOrder(false)
     }
   }
 
@@ -221,156 +234,184 @@ export default function POSPage() {
     }).format(price)
   }
 
-  if (loading) {
+  if (userRole !== "admin") {
     return (
-      <div className="min-h-screen flex flex-col">
-        <Header />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-600"></div>
-        </div>
-        <Footer />
+      <div className="container mx-auto px-4 py-8">
+        <Card>
+          <CardContent className="p-8 text-center">
+            <h2 className="text-2xl font-bold mb-4">Acceso Denegado</h2>
+            <p className="text-gray-600">No tienes permisos para acceder al punto de venta.</p>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
-  if (!user || userRole !== "admin") {
-    return null
-  }
-
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-      <main className="flex-1 container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-8">Punto de Venta</h1>
+    <div className="container mx-auto px-4 py-8">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold mb-2">Punto de Venta</h1>
+        <p className="text-gray-600">Sistema de ventas para la tienda física</p>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Products Section */}
-          <div className="lg:col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Productos</CardTitle>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <Input
-                    placeholder="Buscar productos..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* Products Section */}
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Productos</CardTitle>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Buscar productos..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="text-center py-8">Cargando productos...</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
                   {filteredProducts.map((product) => (
-                    <div
-                      key={product.id}
-                      className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                      onClick={() => addToPOS(product)}
-                    >
-                      <h3 className="font-semibold">{product.nombre}</h3>
-                      <p className="text-lg font-bold text-blue-600">{formatPrice(product.precio)}</p>
-                      <div className="flex justify-between items-center mt-2">
-                        <Badge variant={product.stock && product.stock > 0 ? "default" : "destructive"}>
-                          Stock: {product.stock || 0}
-                        </Badge>
+                    <Card key={product.id} className="cursor-pointer hover:shadow-md transition-shadow">
+                      <CardContent className="p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <h3 className="font-semibold text-sm">{product.nombre}</h3>
+                          {product.tipo === "propio" && product.stock !== null && (
+                            <Badge variant={product.stock > 0 ? "secondary" : "destructive"}>
+                              Stock: {product.stock}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-lg font-bold text-blue-600 mb-2">{formatPrice(product.precio)}</p>
+                        <Button
+                          onClick={() => addToCart(product)}
+                          className="w-full"
+                          disabled={product.tipo === "propio" && product.stock === 0}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Agregar
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Cart and Checkout Section */}
+        <div>
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <ShoppingCart className="h-5 w-5 mr-2" />
+                Carrito ({cart.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {cart.length === 0 ? (
+                <p className="text-gray-500 text-center py-4">Carrito vacío</p>
+              ) : (
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {cart.map((item) => (
+                    <div key={item.product.id} className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-sm">{item.product.nombre}</h4>
+                        <p className="text-sm text-gray-600">{formatPrice(item.product.precio)} c/u</p>
+                      </div>
+                      <div className="flex items-center space-x-2">
                         <Button
                           size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            addToPOS(product)
-                          }}
+                          variant="outline"
+                          onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
                         >
-                          <Plus className="h-4 w-4" />
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <span className="w-8 text-center">{item.quantity}</span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                        <Button size="sm" variant="destructive" onClick={() => removeFromCart(item.product.id)}>
+                          <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
                     </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              )}
 
-          {/* Cart Section */}
-          <div>
-            <Card className="sticky top-4">
-              <CardHeader>
-                <CardTitle>Venta Actual</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {posItems.length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">No hay productos agregados</p>
-                ) : (
-                  <>
-                    <div className="space-y-3 max-h-64 overflow-y-auto">
-                      {posItems.map((item) => (
-                        <div key={item.product.id} className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <p className="font-medium text-sm">{item.product.nombre}</p>
-                            <p className="text-sm text-gray-600">{formatPrice(item.product.precio)}</p>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-                            >
-                              <Minus className="h-3 w-3" />
-                            </Button>
-                            <span className="w-8 text-center">{item.quantity}</span>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
-                            >
-                              <Plus className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeFromPOS(item.product.id)}
-                              className="text-red-600"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+              {cart.length > 0 && (
+                <>
+                  <Separator className="my-4" />
+                  <div className="flex justify-between items-center text-lg font-bold">
+                    <span>Total:</span>
+                    <span>{formatPrice(getTotal())}</span>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
 
-                    <Separator />
+          {/* Customer Info */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Información del Cliente</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Input
+                placeholder="Nombre del cliente *"
+                value={customerInfo.nombre}
+                onChange={(e) => setCustomerInfo({ ...customerInfo, nombre: e.target.value })}
+              />
+              <Input
+                placeholder="Email (opcional)"
+                type="email"
+                value={customerInfo.email}
+                onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
+              />
+              <Input
+                placeholder="Teléfono (opcional)"
+                value={customerInfo.telefono}
+                onChange={(e) => setCustomerInfo({ ...customerInfo, telefono: e.target.value })}
+              />
+            </CardContent>
+          </Card>
 
-                    <div className="space-y-4">
-                      <div className="flex justify-between font-semibold text-lg">
-                        <span>Total:</span>
-                        <span>{formatPrice(getTotal())}</span>
-                      </div>
+          {/* Payment Method */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Método de Pago</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar método de pago" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="efectivo">Efectivo</SelectItem>
+                  <SelectItem value="tarjeta_debito">Tarjeta Débito</SelectItem>
+                  <SelectItem value="tarjeta_credito">Tarjeta Crédito</SelectItem>
+                  <SelectItem value="transferencia">Transferencia</SelectItem>
+                </SelectContent>
+              </Select>
+            </CardContent>
+          </Card>
 
-                      <div>
-                        <Label htmlFor="payment_method">Método de Pago</Label>
-                        <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar método" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="efectivo">Efectivo</SelectItem>
-                            <SelectItem value="tarjeta">Tarjeta</SelectItem>
-                            <SelectItem value="transferencia">Transferencia</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <Button className="w-full" size="lg" onClick={processSale} disabled={processing}>
-                        {processing ? "Procesando..." : "Procesar Venta"}
-                      </Button>
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          {/* Process Order */}
+          <Button onClick={processOrder} disabled={cart.length === 0 || processingOrder} className="w-full" size="lg">
+            {processingOrder ? "Procesando..." : "Procesar Venta"}
+          </Button>
         </div>
-      </main>
-      <Footer />
+      </div>
     </div>
   )
 }

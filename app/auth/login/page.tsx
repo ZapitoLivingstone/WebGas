@@ -50,12 +50,6 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      if (!supabase) {
-        setErrors({ general: "No se pudo conectar con el servicio de autenticación." })
-        setLoading(false)
-        return
-      }
-
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,

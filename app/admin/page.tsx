@@ -20,14 +20,7 @@ export default function AdminPage() {
     totalOrders: 0,
     totalRevenue: 0,
   })
-  type RecentOrder = {
-    id: any
-    fecha: any
-    total: any
-    estado: any
-    usuario: { nombre: any; email: any }
-  }
-  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([])
+  const [recentOrders, setRecentOrders] = useState([])
   const router = useRouter()
 
   useEffect(() => {
@@ -39,15 +32,12 @@ export default function AdminPage() {
   useEffect(() => {
     if (user && userRole === "admin") {
       fetchStats()
-      setRecentOrders([])
+      fetchRecentOrders()
     }
   }, [user, userRole])
 
   const fetchStats = async () => {
     try {
-      if (!supabase) {
-        throw new Error("Supabase client is not initialized.")
-      }
       // Obtener estadísticas
       const [productsRes, usersRes, ordersRes] = await Promise.all([
         supabase.from("productos").select("id", { count: "exact" }),
@@ -65,11 +55,11 @@ export default function AdminPage() {
       })
     } catch (error) {
       console.error("Error fetching stats:", error)
+    }
+  }
+
   const fetchRecentOrders = async () => {
     try {
-      if (!supabase) {
-        throw new Error("Supabase client is not initialized.")
-      }
       const { data } = await supabase
         .from("pedidos")
         .select(`
@@ -82,16 +72,8 @@ export default function AdminPage() {
         .order("fecha", { ascending: false })
         .limit(10)
 
-      setRecentOrders(
-        (data || []).map((order: any) => ({
-          ...order,
-          usuario: Array.isArray(order.usuario) ? order.usuario[0] || null : order.usuario,
-        }))
-      )
+      setRecentOrders(data || [])
     } catch (error) {
-      console.error("Error fetching recent orders:", error)
-    }
-  }
       console.error("Error fetching recent orders:", error)
     }
   }
