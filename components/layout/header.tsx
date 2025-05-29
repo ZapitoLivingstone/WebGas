@@ -17,9 +17,10 @@ import { useCart } from "@/hooks/use-cart"
 import { useWishlist } from "@/hooks/use-wishlist"
 
 export function Header() {
-  const { user, userRole, signOut } = useAuth()
+  const { user, userRole, signOut, loading } = useAuth()
   const { cartCount } = useCart()
   const { wishlistCount } = useWishlist()
+  if (loading) return null // o un skeleton/spinner si prefieres
 
   return (
     <header className="border-b bg-white sticky top-0 z-50">

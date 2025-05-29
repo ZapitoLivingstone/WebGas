@@ -1,23 +1,8 @@
 "use client"
 
-import type React from "react"
-import { createContext, useContext, useEffect, useState } from "react"
-import { createClient } from "@supabase/supabase-js"
+import React, { createContext, useContext, useEffect, useState } from "react"
 import type { User } from "@supabase/supabase-js"
-
-// Check for required environment variables
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-// Validate environment variables
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error("Missing Supabase environment variables:")
-  console.error("NEXT_PUBLIC_SUPABASE_URL:", supabaseUrl ? "✓ Set" : "✗ Missing")
-  console.error("NEXT_PUBLIC_SUPABASE_ANON_KEY:", supabaseAnonKey ? "✓ Set" : "✗ Missing")
-}
-
-// Create Supabase client only if environment variables are available
-const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null
+import { supabase } from "@/lib/supabase"
 
 interface AuthContextType {
   user: User | null
@@ -32,91 +17,99 @@ const AuthContext = createContext<AuthContextType>({
   userRole: null,
   loading: true,
   signOut: async () => {},
-  isConfigured: false,
+  isConfigured: true,
 })
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const isConfigured = !!supabase
 
   useEffect(() => {
-    if (!supabase) {
-      setLoading(false)
-      return
-    }
-
-    const getUser = async () => {
+    // Carga inicial de sesión y rol
+    const loadSessionAndRole = async () => {
+      setLoading(true)
       try {
         const {
-          data: { user },
-        } = await supabase.auth.getUser()
-        setUser(user)
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession()
 
-        if (user) {
-          // Obtener el rol del usuario desde la tabla usuarios
-          const { data: userData } = await supabase.from("usuarios").select("rol").eq("id", user.id).single()
-
-          setUserRole(userData?.rol || null)
+        if (sessionError || !session?.user) {
+          setUser(null)
+          setUserRole(null)
+          return
         }
-      } catch (error) {
-        console.error("Error getting user:", error)
+
+        setUser(session.user)
+        // Lectura de rol con maybeSingle para evitar errores 406
+        const { data: profile, error: roleError } = await supabase
+          .from("usuarios")
+          .select("rol")
+          .eq("id", session.user.id)
+          .maybeSingle()
+
+        if (roleError) console.warn("No se pudo leer el rol inicial:", roleError)
+        setUserRole(profile?.rol ?? null)
+      } catch (err) {
+        console.error("Error cargando sesión y rol:", err)
+        setUser(null)
+        setUserRole(null)
       } finally {
         setLoading(false)
       }
     }
 
-    getUser()
+    loadSessionAndRole()
 
+    // Suscripción a cambios de auth sin alterar loading
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setUser(session?.user || null)
-
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
-        try {
-          const { data: userData } = await supabase.from("usuarios").select("rol").eq("id", session.user.id).single()
-
-          setUserRole(userData?.rol || null)
-        } catch (error) {
-          console.error("Error getting user role:", error)
-          setUserRole(null)
-        }
+        setUser(session.user)
+        const { data: profile, error } = await supabase
+          .from("usuarios")
+          .select("rol")
+          .eq("id", session.user.id)
+          .maybeSingle()
+        if (error) console.warn("No se pudo leer el rol tras cambio de estado:", error)
+        setUserRole(profile?.rol ?? null)
       } else {
+        setUser(null)
         setUserRole(null)
       }
-
-      setLoading(false)
+      // No tocar loading aquí para que el header no desaparezca
     })
 
     return () => subscription.unsubscribe()
   }, [])
 
   const signOut = async () => {
-    if (!supabase) return
-
     try {
       await supabase.auth.signOut()
       setUser(null)
       setUserRole(null)
     } catch (error) {
-      console.error("Error signing out:", error)
+      console.error("Error durante signOut:", error)
     }
   }
 
   return (
-    <AuthContext.Provider value={{ user, userRole, loading, signOut, isConfigured }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider
+      value={{ user, userRole, loading, signOut, isConfigured: true }}
+    >
+      {children}
+    </AuthContext.Provider>
   )
 }
 
 export const useAuth = () => {
   const context = useContext(AuthContext)
   if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider")
+    throw new Error("useAuth debe usarse dentro de AuthProvider")
   }
   return context
 }
 
-// Export supabase client for use in other components
 export { supabase }
