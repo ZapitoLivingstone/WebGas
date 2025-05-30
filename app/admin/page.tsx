@@ -20,7 +20,14 @@ export default function AdminPage() {
     totalOrders: 0,
     totalRevenue: 0,
   })
-  const [recentOrders, setRecentOrders] = useState([])
+  type RecentOrder = {
+    id: any
+    fecha: any
+    total: any
+    estado: any
+    usuario: { nombre: any; email: any }
+  }
+  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([])
   const router = useRouter()
 
   useEffect(() => {
@@ -72,7 +79,12 @@ export default function AdminPage() {
         .order("fecha", { ascending: false })
         .limit(10)
 
-      setRecentOrders(data || [])
+      setRecentOrders(
+        (data || []).map((order: any) => ({
+          ...order,
+          usuario: Array.isArray(order.usuario) ? order.usuario[0] : order.usuario,
+        }))
+      )
     } catch (error) {
       console.error("Error fetching recent orders:", error)
     }
@@ -157,72 +169,7 @@ export default function AdminPage() {
           </Card>
         </div>
 
-        <Tabs defaultValue="orders" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="orders">Pedidos Recientes</TabsTrigger>
-            <TabsTrigger value="products">Gestión de Productos</TabsTrigger>
-            <TabsTrigger value="users">Gestión de Usuarios</TabsTrigger>
-          </TabsList>
 
-          <TabsContent value="orders" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Pedidos Recientes</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {recentOrders.map((order: any) => (
-                    <div key={order.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div>
-                        <p className="font-semibold">Pedido #{order.id}</p>
-                        <p className="text-sm text-gray-600">
-                          {order.usuario?.nombre} - {order.usuario?.email}
-                        </p>
-                        <p className="text-sm text-gray-500">{formatDate(order.fecha)}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold">{formatPrice(order.total)}</p>
-                        <Badge variant={order.estado === "completado" ? "default" : "secondary"}>{order.estado}</Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="products" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Gestión de Productos</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <Button onClick={() => router.push("/admin/products/new")}>Agregar Nuevo Producto</Button>
-                  <Button variant="outline" onClick={() => router.push("/admin/products")}>
-                    Ver Todos los Productos
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="users" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Gestión de Usuarios</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <Button onClick={() => router.push("/admin/users")}>Ver Todos los Usuarios</Button>
-                  <Button variant="outline" onClick={() => router.push("/admin/distributors")}>
-                    Gestionar Distribuidores
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
       </main>
       <Footer />
     </div>

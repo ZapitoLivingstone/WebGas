@@ -68,7 +68,17 @@ export default function OrdersPage() {
         .order("fecha", { ascending: false })
 
       if (error) throw error
-      setOrders(data || [])
+      setOrders(
+        (data || []).map((order: any) => ({
+          ...order,
+          detalle_pedido: (order.detalle_pedido || []).map((detalle: any) => ({
+            ...detalle,
+            producto: Array.isArray(detalle.producto) ? detalle.producto[0] : detalle.producto,
+            cantidad: Number(detalle.cantidad),
+            precio_unitario: Number(detalle.precio_unitario),
+          })),
+        }))
+      )
     } catch (error) {
       console.error("Error fetching orders:", error)
     } finally {

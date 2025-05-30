@@ -3,20 +3,24 @@ export interface Database {
     Tables: {
       usuarios: {
         Row: {
-          id: string
+          id: string // UUID
           nombre: string
           email: string
           password_hash: string
           rol: "cliente" | "admin" | "distribuidor"
           creado_en: string
+          direccion: string | null // NUEVO CAMPO
+          telefono: string | null // NUEVO CAMPO
         }
         Insert: {
-          id?: string
+          id?: string // UUID opcional
           nombre: string
           email: string
           password_hash: string
           rol: "cliente" | "admin" | "distribuidor"
           creado_en?: string
+          direccion?: string | null // NUEVO CAMPO
+          telefono?: string | null // NUEVO CAMPO
         }
         Update: {
           id?: string
@@ -25,15 +29,17 @@ export interface Database {
           password_hash?: string
           rol?: "cliente" | "admin" | "distribuidor"
           creado_en?: string
+          direccion?: string | null // NUEVO CAMPO
+          telefono?: string | null // NUEVO CAMPO
         }
       }
       categorias: {
         Row: {
-          id: number
+          id: number // SERIAL
           nombre: string
         }
         Insert: {
-          id?: number
+          id?: number // SERIAL opcional
           nombre: string
         }
         Update: {
@@ -43,19 +49,19 @@ export interface Database {
       }
       productos: {
         Row: {
-          id: number
+          id: number // SERIAL
           nombre: string
           descripcion: string | null
-          precio: number
+          precio: number // NUMERIC(10,2)
           stock: number | null
           imagen_url: string | null
           tipo: "propio" | "dropshipping"
           activo: boolean
-          creado_por: string | null
-          categoria_id: number | null
+          creado_por: string | null // UUID
+          categoria_id: number | null // INTEGER
         }
         Insert: {
-          id?: number
+          id?: number // SERIAL opcional
           nombre: string
           descripcion?: string | null
           precio: number
@@ -63,7 +69,7 @@ export interface Database {
           imagen_url?: string | null
           tipo: "propio" | "dropshipping"
           activo?: boolean
-          creado_por?: string | null
+          creado_por?: string | null // UUID
           categoria_id?: number | null
         }
         Update: {
@@ -81,13 +87,13 @@ export interface Database {
       }
       pedidos: {
         Row: {
-          id: number
-          usuario_id: string | null
+          id: number // SERIAL
+          usuario_id: string | null // UUID
           fecha: string
           tipo_pago: string
           estado: string
           envio_direccion: string | null
-          total: number | null
+          total: number | null // NUMERIC(10,2)
         }
         Insert: {
           id?: number
@@ -110,11 +116,11 @@ export interface Database {
       }
       detalle_pedido: {
         Row: {
-          id: number
+          id: number // SERIAL
           pedido_id: number | null
           producto_id: number | null
           cantidad: number
-          precio_unitario: number
+          precio_unitario: number // NUMERIC(10,2)
           tipo_producto: "propio" | "dropshipping" | null
         }
         Insert: {
@@ -136,10 +142,10 @@ export interface Database {
       }
       notificaciones_distribuidor: {
         Row: {
-          id: number
+          id: number // SERIAL
           pedido_id: number | null
           producto_id: number | null
-          distribuidor_id: string | null
+          distribuidor_id: string | null // UUID
           estado: string
           fecha_envio: string
         }
@@ -162,11 +168,11 @@ export interface Database {
       }
       ventas_pos: {
         Row: {
-          id: number
-          admin_id: string | null
+          id: number // SERIAL
+          admin_id: string | null // UUID
           producto_id: number | null
           cantidad: number
-          precio_unitario: number
+          precio_unitario: number // NUMERIC(10,2)
           fecha: string
           metodo_pago: string | null
         }
@@ -191,8 +197,8 @@ export interface Database {
       }
       carts: {
         Row: {
-          user_id: string
-          product_id: number
+          user_id: string // UUID
+          product_id: number // INTEGER
           quantity: number
           created_at: string
         }
@@ -211,8 +217,8 @@ export interface Database {
       }
       wishlist: {
         Row: {
-          user_id: string
-          product_id: number
+          user_id: string // UUID
+          product_id: number // INTEGER
           created_at: string
         }
         Insert: {

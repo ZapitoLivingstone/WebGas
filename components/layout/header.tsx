@@ -3,7 +3,6 @@
 import Link from "next/link"
 import { ShoppingCart, Heart, User, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
@@ -34,13 +33,7 @@ export function Header() {
             <span className="font-bold text-xl">Gásfiter Pro</span>
           </Link>
 
-          {/* Search Bar */}
-          <div className="hidden md:flex flex-1 max-w-md mx-8">
-            <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input placeholder="Buscar productos..." className="pl-10" />
-            </div>
-          </div>
+
 
           {/* Navigation */}
           <nav className="flex items-center space-x-4">
