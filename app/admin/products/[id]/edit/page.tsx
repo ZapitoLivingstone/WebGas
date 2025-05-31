@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/providers/auth-provider"
@@ -51,8 +50,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
   const router = useRouter()
   const { toast } = useToast()
 
-  const productId = Number.parseInt(params.id)
-
+  const [productId, setProductId] = useState<number | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -77,7 +75,16 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
   }, [user, userRole, loading, router])
 
   useEffect(() => {
-    if (user && userRole === "admin") {
+    if (params.id) {
+      const id = Number.parseInt(params.id)
+      if (!isNaN(id)) {
+        setProductId(id)
+      }
+    }
+  }, [params.id])
+
+  useEffect(() => {
+    if (user && userRole === "admin" && productId !== null) {
       fetchCategories()
       fetchProduct()
     }
@@ -93,6 +100,8 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
   }
 
   const fetchProduct = async () => {
+    if (productId === null) return
+
     try {
       setIsLoading(true)
       const product = await getProduct(productId)
@@ -240,10 +249,6 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    console.log("=== FORM SUBMIT DEBUG ===")
-    console.log("Form data:", formData)
-    console.log("Product ID:", productId)
-
     if (!formData.nombre?.trim() || !formData.precio || !formData.categoria_id) {
       toast({
         title: "Error",
@@ -253,10 +258,11 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
       return
     }
 
+    if (productId === null) return
+
     setIsSubmitting(true)
 
     try {
-      // Preparar datos SOLO con campos que existen en la tabla
       const productData = {
         nombre: formData.nombre.trim(),
         descripcion: formData.descripcion?.trim() || null,
@@ -268,10 +274,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
         imagen_url: formData.imagen_url?.trim() || null,
       }
 
-      console.log("Submitting product data (only valid fields):", productData)
-
-      const result = await updateProduct(productId, productData)
-      console.log("Update result:", result)
+      await updateProduct(productId, productData)
 
       toast({
         title: "Producto actualizado",
@@ -280,9 +283,6 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
 
       router.push("/admin/products")
     } catch (error: any) {
-      console.error("=== FORM ERROR HANDLER ===")
-      console.error("Full error object:", error)
-
       let errorMessage = "No se pudo actualizar el producto"
 
       if (error instanceof Error) {
