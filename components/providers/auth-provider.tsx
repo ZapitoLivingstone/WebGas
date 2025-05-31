@@ -1,8 +1,19 @@
 "use client"
 
-import React, { createContext, useContext, useEffect, useState } from "react"
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react"
+import { createClient } from "@supabase/supabase-js"
 import type { User } from "@supabase/supabase-js"
-import { supabase } from "@/lib/supabase"
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error("Missing Supabase environment variables:")
+  console.error("NEXT_PUBLIC_SUPABASE_URL:", supabaseUrl ? "✓ Set" : "✗ Missing")
+  console.error("NEXT_PUBLIC_SUPABASE_ANON_KEY:", supabaseAnonKey ? "✓ Set" : "✗ Missing")
+}
+
+const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null
 
 interface AuthContextType {
   user: User | null
@@ -10,6 +21,7 @@ interface AuthContextType {
   loading: boolean
   signOut: () => Promise<void>
   isConfigured: boolean
+  refreshAuth: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -17,88 +29,133 @@ const AuthContext = createContext<AuthContextType>({
   userRole: null,
   loading: true,
   signOut: async () => {},
-  isConfigured: true,
+  isConfigured: false,
+  refreshAuth: async () => {},
 })
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [initialized, setInitialized] = useState(false)
+  const isConfigured = !!supabase
 
-  useEffect(() => {
-    // Carga inicial de sesión y rol
-    const loadSessionAndRole = async () => {
-      setLoading(true)
-      try {
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession()
+  const getUserRole = async (userId: string) => {
+    if (!supabase) return null
 
-        if (sessionError || !session?.user) {
-          setUser(null)
-          setUserRole(null)
-          return
-        }
-
-        setUser(session.user)
-        // Lectura de rol con maybeSingle para evitar errores 406
-        const { data: profile, error: roleError } = await supabase
-          .from("usuarios")
-          .select("rol")
-          .eq("id", session.user.id)
-          .maybeSingle()
-
-        if (roleError) console.warn("No se pudo leer el rol inicial:", roleError)
-        setUserRole(profile?.rol ?? null)
-      } catch (err) {
-        console.error("Error cargando sesión y rol:", err)
-        setUser(null)
-        setUserRole(null)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadSessionAndRole()
-
-    // Suscripción a cambios de auth sin alterar loading
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user) {
-        setUser(session.user)
-        const { data: profile, error } = await supabase
-          .from("usuarios")
-          .select("rol")
-          .eq("id", session.user.id)
-          .maybeSingle()
-        if (error) console.warn("No se pudo leer el rol tras cambio de estado:", error)
-        setUserRole(profile?.rol ?? null)
-      } else {
-        setUser(null)
-        setUserRole(null)
-      }
-      // No tocar loading aquí para que el header no desaparezca
-    })
-
-    return () => subscription.unsubscribe()
-  }, [])
-
-  const signOut = async () => {
     try {
-      await supabase.auth.signOut()
-      setUser(null)
-      setUserRole(null)
+      const { data: userData, error } = await supabase.from("usuarios").select("rol").eq("id", userId).single()
+
+      if (error) {
+        console.error("Error fetching user role:", error)
+        return null
+      }
+
+      return userData?.rol || null
     } catch (error) {
-      console.error("Error durante signOut:", error)
+      console.error("Error in getUserRole:", error)
+      return null
     }
   }
 
+  const refreshAuth = useCallback(async () => {
+    if (!supabase) return
+
+    try {
+      setLoading(true)
+      const {
+        data: { user: currentUser },
+      } = await supabase.auth.getUser()
+
+      setUser(currentUser)
+
+      if (currentUser) {
+        const role = await getUserRole(currentUser.id)
+        setUserRole(role)
+        console.log("Auth refreshed - User:", currentUser.email, "Role:", role)
+      } else {
+        setUserRole(null)
+      }
+    } catch (error) {
+      console.error("Error refreshing auth:", error)
+      setUser(null)
+      setUserRole(null)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!supabase) {
+      setLoading(false)
+      setInitialized(true)
+      return
+    }
+
+    const initializeAuth = async () => {
+      await refreshAuth()
+      setInitialized(true)
+    }
+
+    initializeAuth()
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state changed:", event, session?.user?.email)
+
+      if (event === "SIGNED_OUT") {
+        setUser(null)
+        setUserRole(null)
+        return
+      }
+
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        await refreshAuth()
+      }
+    })
+
+    // Add visibility change listener
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshAuth()
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+
+    return () => {
+      subscription.unsubscribe()
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+    }
+  }, [refreshAuth])
+
+  const signOut = async () => {
+    if (!supabase) return
+
+    try {
+      setLoading(true)
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+
+      setUser(null)
+      setUserRole(null)
+
+      window.location.href = "/"
+    } catch (error) {
+      console.error("Error signing out:", error)
+      throw error
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (!initialized) {
+    return <div>Cargando...</div>
+  }
+
   return (
-    <AuthContext.Provider
-      value={{ user, userRole, loading, signOut, isConfigured: true }}
-    >
+    <AuthContext.Provider value={{ user, userRole, loading, signOut, isConfigured, refreshAuth }}>
       {children}
     </AuthContext.Provider>
   )
@@ -107,7 +164,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export const useAuth = () => {
   const context = useContext(AuthContext)
   if (!context) {
-    throw new Error("useAuth debe usarse dentro de AuthProvider")
+    throw new Error("useAuth must be used within an AuthProvider")
   }
   return context
 }
