@@ -2,12 +2,12 @@
 
 import type React from "react"
 
-import { useState, useEffect, use } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/providers/auth-provider"
 import { getProduct, updateProduct } from "@/lib/products"
 import { supabase } from "@/lib/supabase"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -38,24 +38,20 @@ interface Product {
   nombre: string
   descripcion: string | null
   precio: number
-  stock: number
-  categoria_id: number
+  stock: number | null
+  categoria_id: number | null
   tipo: "propio" | "dropshipping"
   activo: boolean
   imagen_url: string | null
-  sku: string | null
-  peso: number | null
-  dimensiones: string | null
+  creado_por: string | null
 }
 
-export default function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
+export default function EditProductPage({ params }: { params: { id: string } }) {
   const { user, userRole, loading } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
 
-  // Usar React.use() para manejar los parámetros de forma correcta
-  const resolvedParams = use(params)
-  const productId = Number.parseInt(resolvedParams.id)
+  const productId = Number.parseInt(params.id)
 
   const [categories, setCategories] = useState<Category[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -72,9 +68,6 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
     tipo: "propio",
     activo: true,
     imagen_url: "",
-    sku: "",
-    peso: 0,
-    dimensiones: "",
   })
 
   useEffect(() => {
@@ -123,9 +116,6 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         tipo: product.tipo || "propio",
         activo: product.activo ?? true,
         imagen_url: product.imagen_url || "",
-        sku: product.sku || "",
-        peso: product.peso || 0,
-        dimensiones: product.dimensiones || "",
       })
 
       if (product.imagen_url) {
@@ -253,8 +243,6 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
     console.log("=== FORM SUBMIT DEBUG ===")
     console.log("Form data:", formData)
     console.log("Product ID:", productId)
-    console.log("User:", user?.id)
-    console.log("User role:", userRole)
 
     if (!formData.nombre?.trim() || !formData.precio || !formData.categoria_id) {
       toast({
@@ -268,22 +256,19 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
     setIsSubmitting(true)
 
     try {
-      // Preparar datos para actualización
+      // Preparar datos SOLO con campos que existen en la tabla
       const productData = {
         nombre: formData.nombre.trim(),
         descripcion: formData.descripcion?.trim() || null,
         precio: Number(formData.precio),
-        stock: Number(formData.stock) || 0,
+        stock: formData.tipo === "propio" ? Number(formData.stock) : null,
         categoria_id: Number(formData.categoria_id),
         tipo: formData.tipo as "propio" | "dropshipping",
         activo: Boolean(formData.activo),
         imagen_url: formData.imagen_url?.trim() || null,
-        sku: formData.sku?.trim() || null,
-        peso: formData.peso ? Number(formData.peso) : null,
-        dimensiones: formData.dimensiones?.trim() || null,
       }
 
-      console.log("Submitting product data:", productData)
+      console.log("Submitting product data (only valid fields):", productData)
 
       const result = await updateProduct(productId, productData)
       console.log("Update result:", result)
@@ -296,10 +281,6 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
       router.push("/admin/products")
     } catch (error: any) {
       console.error("=== FORM ERROR HANDLER ===")
-      console.error("Error type:", typeof error)
-      console.error("Error constructor:", error?.constructor?.name)
-      console.error("Error message:", error?.message)
-      console.error("Error stack:", error?.stack)
       console.error("Full error object:", error)
 
       let errorMessage = "No se pudo actualizar el producto"
@@ -353,31 +334,20 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           <Card>
             <CardHeader>
               <CardTitle>Información del Producto</CardTitle>
+              <CardDescription>Edita los datos del producto</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Información básica */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="nombre">Nombre *</Label>
-                    <Input
-                      id="nombre"
-                      value={formData.nombre || ""}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, nombre: e.target.value }))}
-                      placeholder="Nombre del producto"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="sku">SKU</Label>
-                    <Input
-                      id="sku"
-                      value={formData.sku || ""}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, sku: e.target.value }))}
-                      placeholder="Código SKU"
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="nombre">Nombre del Producto *</Label>
+                  <Input
+                    id="nombre"
+                    value={formData.nombre || ""}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, nombre: e.target.value }))}
+                    placeholder="Nombre del producto"
+                    required
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -392,7 +362,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
                 </div>
 
                 {/* Precio y stock */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="precio">Precio *</Label>
                     <Input
@@ -410,7 +380,9 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="stock">Stock</Label>
+                    <Label htmlFor="stock">
+                      Stock {formData.tipo === "propio" ? "*" : "(No aplica para dropshipping)"}
+                    </Label>
                     <Input
                       id="stock"
                       type="number"
@@ -421,25 +393,11 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
                       }
                       placeholder="0"
                       disabled={formData.tipo === "dropshipping"}
+                      required={formData.tipo === "propio"}
                     />
                     {formData.tipo === "dropshipping" && (
                       <p className="text-sm text-muted-foreground">Stock no aplica para productos dropshipping</p>
                     )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="peso">Peso (kg)</Label>
-                    <Input
-                      id="peso"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formData.peso || ""}
-                      onChange={(e) =>
-                        setFormData((prev) => ({ ...prev, peso: Number.parseFloat(e.target.value) || 0 }))
-                      }
-                      placeholder="0.00"
-                    />
                   </div>
                 </div>
 
@@ -467,7 +425,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="tipo">Tipo</Label>
+                    <Label htmlFor="tipo">Tipo de Producto *</Label>
                     <Select
                       value={formData.tipo || "propio"}
                       onValueChange={(value: "propio" | "dropshipping") =>
@@ -478,21 +436,11 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="propio">Propio</SelectItem>
-                        <SelectItem value="dropshipping">Dropshipping</SelectItem>
+                        <SelectItem value="propio">Propio (con stock)</SelectItem>
+                        <SelectItem value="dropshipping">Dropshipping (sin stock)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="dimensiones">Dimensiones</Label>
-                  <Input
-                    id="dimensiones"
-                    value={formData.dimensiones || ""}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, dimensiones: e.target.value }))}
-                    placeholder="Ej: 20x15x10 cm"
-                  />
                 </div>
 
                 {/* Imagen */}
@@ -572,12 +520,14 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
                 {/* Estado activo */}
                 <div className="flex items-center space-x-2">
                   <Switch id="activo" checked={formData.activo} onCheckedChange={handleToggleActive} />
-                  <Label htmlFor="activo">Producto {formData.activo ? "activo" : "inactivo"}</Label>
+                  <Label htmlFor="activo">
+                    Producto {formData.activo ? "activo" : "inactivo"} (visible en la tienda)
+                  </Label>
                 </div>
 
                 {/* Botones */}
                 <div className="flex gap-4 pt-4">
-                  <Button type="submit" disabled={isSubmitting} className="flex-1">
+                  <Button type="submit" disabled={isSubmitting || isUploading} className="flex-1">
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />

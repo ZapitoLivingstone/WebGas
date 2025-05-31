@@ -1,8 +1,9 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { supabase } from "@/components/providers/auth-provider"
+import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/providers/auth-provider"
+import { create } from "zustand"
 
 interface WishlistItem {
   product_id: number
@@ -17,16 +18,34 @@ interface WishlistItem {
   }
 }
 
+// Store global para sincronización entre componentes
+interface WishlistStore {
+  count: number
+  items: WishlistItem[]
+  setCount: (count: number) => void
+  setItems: (items: WishlistItem[]) => void
+  updateTimestamp: number
+  triggerUpdate: () => void
+}
+
+const useWishlistStore = create<WishlistStore>((set) => ({
+  count: 0,
+  items: [],
+  setCount: (count) => set({ count }),
+  setItems: (items) => set({ items }),
+  updateTimestamp: Date.now(),
+  triggerUpdate: () => set({ updateTimestamp: Date.now() }),
+}))
+
 export function useWishlist() {
-  const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([])
-  const [wishlistCount, setWishlistCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const { user, isConfigured } = useAuth()
+  const { count, items, setCount, setItems, updateTimestamp, triggerUpdate } = useWishlistStore()
 
   const fetchWishlistItems = useCallback(async () => {
     if (!user || !supabase) {
-      setWishlistItems([])
-      setWishlistCount(0)
+      setItems([])
+      setCount(0)
       setLoading(false)
       return
     }
@@ -50,15 +69,22 @@ export function useWishlist() {
 
       if (error) throw error
 
-      const items = data || []
-      setWishlistItems(items)
-      setWishlistCount(items.length)
+      const fetchedItems = (data || []).map((item: any) => ({
+        ...item,
+        product: Array.isArray(item.product) ? item.product[0] : item.product,
+      }))
+      const newCount = fetchedItems.length
+
+      setItems(fetchedItems)
+      setCount(newCount)
+
+      console.log("Wishlist updated:", { items: fetchedItems.length, count: newCount })
     } catch (error) {
       console.error("Error fetching wishlist items:", error)
     } finally {
       setLoading(false)
     }
-  }, [user])
+  }, [user, setItems, setCount])
 
   useEffect(() => {
     if (!isConfigured) {
@@ -67,12 +93,15 @@ export function useWishlist() {
     }
 
     fetchWishlistItems()
-  }, [user, isConfigured, fetchWishlistItems])
+  }, [user, isConfigured, fetchWishlistItems, updateTimestamp])
 
   const addToWishlist = async (productId: number) => {
     if (!user || !supabase) throw new Error("User not authenticated or Supabase not configured")
 
     try {
+      // Actualizar optimísticamente
+      setCount(count + 1)
+
       const { error } = await supabase.from("wishlist").insert({
         user_id: user.id,
         product_id: productId,
@@ -80,7 +109,8 @@ export function useWishlist() {
 
       if (error) throw error
 
-      // Actualizar inmediatamente el estado local
+      // Forzar actualización global
+      triggerUpdate()
       await fetchWishlistItems()
     } catch (error) {
       console.error("Error adding to wishlist:", error)
@@ -92,11 +122,15 @@ export function useWishlist() {
     if (!user || !supabase) throw new Error("User not authenticated or Supabase not configured")
 
     try {
+      // Actualizar optimísticamente
+      setCount(count - 1)
+
       const { error } = await supabase.from("wishlist").delete().eq("user_id", user.id).eq("product_id", productId)
 
       if (error) throw error
 
-      // Actualizar inmediatamente el estado local
+      // Forzar actualización global
+      triggerUpdate()
       await fetchWishlistItems()
     } catch (error) {
       console.error("Error removing from wishlist:", error)
@@ -105,12 +139,12 @@ export function useWishlist() {
   }
 
   const isInWishlist = (productId: number) => {
-    return wishlistItems.some((item) => item.product_id === productId)
+    return items.some((item) => item.product_id === productId)
   }
 
   return {
-    wishlistItems,
-    wishlistCount,
+    wishlistItems: items,
+    wishlistCount: count,
     loading,
     addToWishlist,
     removeFromWishlist,

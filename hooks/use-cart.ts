@@ -1,8 +1,9 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { supabase } from "@/components/providers/auth-provider"
+import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/providers/auth-provider"
+import { create } from "zustand"
 
 interface CartItem {
   product_id: number
@@ -17,16 +18,34 @@ interface CartItem {
   }
 }
 
+// Store global para sincronización entre componentes
+interface CartStore {
+  count: number
+  items: CartItem[]
+  setCount: (count: number) => void
+  setItems: (items: CartItem[]) => void
+  updateTimestamp: number
+  triggerUpdate: () => void
+}
+
+const useCartStore = create<CartStore>((set) => ({
+  count: 0,
+  items: [],
+  setCount: (count) => set({ count }),
+  setItems: (items) => set({ items }),
+  updateTimestamp: Date.now(),
+  triggerUpdate: () => set({ updateTimestamp: Date.now() }),
+}))
+
 export function useCart() {
-  const [cartItems, setCartItems] = useState<CartItem[]>([])
-  const [cartCount, setCartCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const { user, isConfigured } = useAuth()
+  const { count, items, setCount, setItems, updateTimestamp, triggerUpdate } = useCartStore()
 
   const fetchCartItems = useCallback(async () => {
     if (!user || !supabase) {
-      setCartItems([])
-      setCartCount(0)
+      setItems([])
+      setCount(0)
       setLoading(false)
       return
     }
@@ -50,15 +69,22 @@ export function useCart() {
 
       if (error) throw error
 
-      const items = data || []
-      setCartItems(items)
-      setCartCount(items.reduce((sum, item) => sum + item.quantity, 0))
+      const fetchedItems = (data || []).map((item: any) => ({
+        ...item,
+        product: Array.isArray(item.product) ? item.product[0] : item.product,
+      }))
+      const newCount = fetchedItems.reduce((sum: number, item: any) => sum + item.quantity, 0)
+
+      setItems(fetchedItems)
+      setCount(newCount)
+
+      console.log("Cart updated:", { items: fetchedItems.length, count: newCount })
     } catch (error) {
       console.error("Error fetching cart items:", error)
     } finally {
       setLoading(false)
     }
-  }, [user])
+  }, [user, setItems, setCount])
 
   useEffect(() => {
     if (!isConfigured) {
@@ -67,12 +93,15 @@ export function useCart() {
     }
 
     fetchCartItems()
-  }, [user, isConfigured, fetchCartItems])
+  }, [user, isConfigured, fetchCartItems, updateTimestamp])
 
   const addToCart = async (productId: number, quantity = 1) => {
     if (!user || !supabase) throw new Error("User not authenticated or Supabase not configured")
 
     try {
+      // Actualizar optimísticamente
+      setCount(count + quantity)
+
       // Verificar si el producto ya está en el carrito
       const { data: existingItem } = await supabase
         .from("carts")
@@ -101,7 +130,8 @@ export function useCart() {
         if (error) throw error
       }
 
-      // Actualizar inmediatamente el estado local
+      // Forzar actualización global
+      triggerUpdate()
       await fetchCartItems()
     } catch (error) {
       console.error("Error adding to cart:", error)
@@ -126,7 +156,8 @@ export function useCart() {
 
       if (error) throw error
 
-      // Actualizar inmediatamente el estado local
+      // Forzar actualización global
+      triggerUpdate()
       await fetchCartItems()
     } catch (error) {
       console.error("Error updating quantity:", error)
@@ -142,7 +173,8 @@ export function useCart() {
 
       if (error) throw error
 
-      // Actualizar inmediatamente el estado local
+      // Forzar actualización global
+      triggerUpdate()
       await fetchCartItems()
     } catch (error) {
       console.error("Error removing from cart:", error)
@@ -158,8 +190,9 @@ export function useCart() {
 
       if (error) throw error
 
-      setCartItems([])
-      setCartCount(0)
+      setItems([])
+      setCount(0)
+      triggerUpdate()
     } catch (error) {
       console.error("Error clearing cart:", error)
       throw error
@@ -167,14 +200,14 @@ export function useCart() {
   }
 
   const getCartTotal = () => {
-    return cartItems.reduce((total, item) => {
+    return items.reduce((total, item) => {
       return total + item.product.precio * item.quantity
     }, 0)
   }
 
   return {
-    cartItems,
-    cartCount,
+    cartItems: items,
+    cartCount: count,
     loading,
     addToCart,
     updateQuantity,
