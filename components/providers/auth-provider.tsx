@@ -1,19 +1,8 @@
 "use client"
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react"
-import { createClient } from "@supabase/supabase-js"
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react"
 import type { User } from "@supabase/supabase-js"
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error("Missing Supabase environment variables:")
-  console.error("NEXT_PUBLIC_SUPABASE_URL:", supabaseUrl ? "✓ Set" : "✗ Missing")
-  console.error("NEXT_PUBLIC_SUPABASE_ANON_KEY:", supabaseAnonKey ? "✓ Set" : "✗ Missing")
-}
-
-const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null
+import { supabase } from "@/lib/supabase"
 
 interface AuthContextType {
   user: User | null
@@ -29,7 +18,7 @@ const AuthContext = createContext<AuthContextType>({
   userRole: null,
   loading: true,
   signOut: async () => {},
-  isConfigured: false,
+  isConfigured: true,
   refreshAuth: async () => {},
 })
 
@@ -37,125 +26,116 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [initialized, setInitialized] = useState(false)
-  const isConfigured = !!supabase
+  const [initialLoading, setInitialLoading] = useState(true)
+  const lastUserId = useRef<string | null>(null)
+  const alreadyRefreshing = useRef(false)
 
-  const getUserRole = async (userId: string) => {
-    if (!supabase) return null
-
+  const fetchUserRole = useCallback(async (userId: string) => {
     try {
-      const { data: userData, error } = await supabase.from("usuarios").select("rol").eq("id", userId).single()
-
+      const { data, error } = await supabase
+        .from("usuarios")
+        .select("rol")
+        .eq("id", userId)
+        .maybeSingle()
       if (error) {
-        console.error("Error fetching user role:", error)
+        console.warn("[Auth] No se pudo leer el rol:", error)
         return null
       }
-
-      return userData?.rol || null
-    } catch (error) {
-      console.error("Error in getUserRole:", error)
+      return data?.rol ?? null
+    } catch (err) {
+      console.error("[Auth] Error al obtener rol:", err)
       return null
-    }
-  }
-
-  const refreshAuth = useCallback(async () => {
-    if (!supabase) return
-
-    try {
-      setLoading(true)
-      const {
-        data: { user: currentUser },
-      } = await supabase.auth.getUser()
-
-      setUser(currentUser)
-
-      if (currentUser) {
-        const role = await getUserRole(currentUser.id)
-        setUserRole(role)
-        console.log("Auth refreshed - User:", currentUser.email, "Role:", role)
-      } else {
-        setUserRole(null)
-      }
-    } catch (error) {
-      console.error("Error refreshing auth:", error)
-      setUser(null)
-      setUserRole(null)
-    } finally {
-      setLoading(false)
     }
   }, [])
 
-  useEffect(() => {
-    if (!supabase) {
-      setLoading(false)
-      setInitialized(true)
+  const refreshAuth = useCallback(async () => {
+    if (alreadyRefreshing.current) {
+      console.log("[Auth] Ya refrescando, ignora nueva llamada")
       return
     }
-
-    const initializeAuth = async () => {
-      await refreshAuth()
-      setInitialized(true)
-    }
-
-    initializeAuth()
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state changed:", event, session?.user?.email)
-
-      if (event === "SIGNED_OUT") {
+    alreadyRefreshing.current = true
+    setLoading(true)
+    try {
+      console.log("[Auth] Llamando supabase.auth.getSession()")
+      const { data: { session }, error } = await supabase.auth.getSession()
+      if (error) {
+        console.warn("[Auth] Error en getSession:", error)
+      }
+      const currentUser = session?.user ?? null
+      console.log("[Auth] Estado de sesión:", session, currentUser)
+      if (!currentUser) {
         setUser(null)
         setUserRole(null)
+        lastUserId.current = null
+        setLoading(false)
+        setInitialLoading(false)
+        alreadyRefreshing.current = false
         return
       }
 
-      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-        await refreshAuth()
+      setUser(currentUser)
+      if (lastUserId.current !== currentUser.id) {
+        const role = await fetchUserRole(currentUser.id)
+        setUserRole(role)
+        lastUserId.current = currentUser.id
+        console.log("[Auth] Usuario y rol seteados:", currentUser.email, role)
+      } else {
+        console.log("[Auth] Mismo usuario, no refresca rol")
       }
-    })
-
-    // Add visibility change listener
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        refreshAuth()
-      }
+    } catch (e) {
+      setUser(null)
+      setUserRole(null)
+      lastUserId.current = null
+      console.error("[Auth] Error general en refreshAuth:", e)
+    } finally {
+      setLoading(false)
+      setInitialLoading(false)
+      alreadyRefreshing.current = false
     }
-    document.addEventListener("visibilitychange", handleVisibilityChange)
+  }, [fetchUserRole])
 
+  useEffect(() => {
+    console.log("[Auth] useEffect: monta y llama refreshAuth")
+    refreshAuth()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("[Auth] Evento onAuthStateChange:", event, session)
+      refreshAuth()
+    })
     return () => {
+      console.log("[Auth] Cleanup: unsubscribe onAuthStateChange")
       subscription.unsubscribe()
-      document.removeEventListener("visibilitychange", handleVisibilityChange)
     }
   }, [refreshAuth])
 
+  if (initialLoading) {
+    return <div className="min-h-screen flex items-center justify-center text-lg">Cargando sesión...</div>
+  }
+
   const signOut = async () => {
-    if (!supabase) return
-
+    setLoading(true)
     try {
-      setLoading(true)
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
-
+      console.log("[Auth] signOut llamado")
+      await supabase.auth.signOut()
       setUser(null)
       setUserRole(null)
-
+      lastUserId.current = null
       window.location.href = "/"
     } catch (error) {
-      console.error("Error signing out:", error)
-      throw error
+      console.error("[Auth] Error durante signOut:", error)
     } finally {
       setLoading(false)
     }
   }
 
-  if (!initialized) {
-    return <div>Cargando...</div>
-  }
-
   return (
-    <AuthContext.Provider value={{ user, userRole, loading, signOut, isConfigured, refreshAuth }}>
+    <AuthContext.Provider value={{
+      user,
+      userRole,
+      loading,
+      signOut,
+      isConfigured: true,
+      refreshAuth
+    }}>
       {children}
     </AuthContext.Provider>
   )
@@ -164,9 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export const useAuth = () => {
   const context = useContext(AuthContext)
   if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider")
+    throw new Error("useAuth debe usarse dentro de AuthProvider")
   }
   return context
 }
-
-export { supabase }
