@@ -15,7 +15,7 @@ import { useCart } from "@/hooks/use-cart"
 import { useToast } from "@/hooks/use-toast"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
-import { supabase } from "@/components/providers/auth-provider"
+import { supabase } from "@/lib/supabase"
 
 export default function CheckoutPage() {
   const { user } = useAuth()

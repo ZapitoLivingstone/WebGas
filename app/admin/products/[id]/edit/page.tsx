@@ -49,6 +49,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
   const { user, userRole, loading } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
+  const id = params.id;
 
   const [productId, setProductId] = useState<number | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
@@ -75,13 +76,13 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
   }, [user, userRole, loading, router])
 
   useEffect(() => {
-    if (params.id) {
-      const id = Number.parseInt(params.id)
-      if (!isNaN(id)) {
-        setProductId(id)
+    if (id) {
+      const pid = Number.parseInt(id)
+      if (!isNaN(pid)) {
+        setProductId(pid)
       }
     }
-  }, [params.id])
+  }, [id])
 
   useEffect(() => {
     if (user && userRole === "admin" && productId !== null) {
