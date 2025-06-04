@@ -80,12 +80,23 @@ export async function POST(request: Request) {
 
     // Actualizar stock para productos propios
     for (const item of items.filter((i: any) => i.tipo === "propio")) {
+      // Obtener el stock actual
+      const { data: producto, error: productoError } = await supabase
+        .from("productos")
+        .select("stock")
+        .eq("id", item.producto_id)
+        .single();
+
+      if (productoError || !producto) continue;
+
+      const nuevoStock = producto.stock - item.cantidad;
+
       await supabase
         .from("productos")
         .update({
-          stock: supabase.raw(`stock - ${item.cantidad}`),
+          stock: nuevoStock,
         })
-        .eq("id", item.producto_id)
+        .eq("id", item.producto_id);
     }
 
     // Limpiar carrito
