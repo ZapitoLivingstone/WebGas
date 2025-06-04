@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -28,11 +26,7 @@ export default function CheckoutPage() {
     payment_method: "",
   })
   const [processing, setProcessing] = useState(false)
-  const [errors, setErrors] = useState<{
-    shipping_address?: string
-    payment_method?: string
-    general?: string
-  }>({})
+  const [errors, setErrors] = useState<{ shipping_address?: string, payment_method?: string, general?: string }>({})
 
   useEffect(() => {
     if (!user && !loading) {
@@ -43,31 +37,39 @@ export default function CheckoutPage() {
     }
   }, [user, cartItems, loading, router])
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("es-CL", {
-      style: "currency",
-      currency: "CLP",
-    }).format(price)
-  }
+  const formatPrice = (price: number) => new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP" }).format(price)
 
-  const validateForm = () => {
-    const newErrors: {
-      shipping_address?: string
-      payment_method?: string
-    } = {}
+  // === Paso clave: FLUJO WEBPAY ===
+  const handleWebpay = async () => {
+    try {
+      const amount = getCartTotal();
+      const buyOrder = "orden-" + Date.now(); // o tu id de pedido único
+      const sessionId = user?.id || "anon";
 
-    if (!formData.shipping_address.trim()) {
-      newErrors.shipping_address = "La dirección de envío es requerida"
+      const res = await fetch("/api/webpay/create", {
+        method: "POST",
+        body: JSON.stringify({ amount, buyOrder, sessionId }),
+        headers: { "Content-Type": "application/json" }
+      });
+      const data = await res.json();
+
+      if (data.token && data.url) {
+        // Crea formulario oculto para redirigir a Webpay (POST)
+        const form = document.createElement("form");
+        form.action = data.url;
+        form.method = "POST";
+        form.innerHTML = `<input type="hidden" name="token_ws" value="${data.token}" />`;
+        document.body.appendChild(form);
+        form.submit();
+      } else {
+        setErrors({ general: "No se pudo iniciar el pago con Webpay." });
+      }
+    } catch (err) {
+      setErrors({ general: "Error conectando con Webpay." });
     }
+  };
 
-    if (!formData.payment_method) {
-      newErrors.payment_method = "Selecciona un método de pago"
-    }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
-
+  // ========== FLUJO CLÁSICO (NO Webpay) ==========
   const createOrder = async () => {
     if (!user || !supabase) throw new Error("Usuario no autenticado")
 
@@ -76,9 +78,9 @@ export default function CheckoutPage() {
       cantidad: item.quantity,
       precio: item.product.precio,
       tipo: item.product.tipo,
-    }))
+    }));
 
-    const total = getCartTotal()
+    const total = getCartTotal();
 
     // Crear pedido
     const { data: order, error: orderError } = await supabase
@@ -87,13 +89,13 @@ export default function CheckoutPage() {
         usuario_id: user.id,
         tipo_pago: formData.payment_method,
         envio_direccion: formData.shipping_address,
-        total: total,
+        total,
         estado: "pendiente",
       })
       .select()
-      .single()
+      .single();
 
-    if (orderError) throw orderError
+    if (orderError) throw orderError;
 
     // Crear detalles del pedido
     const orderDetails = items.map((item) => ({
@@ -102,27 +104,23 @@ export default function CheckoutPage() {
       cantidad: item.cantidad,
       precio_unitario: item.precio,
       tipo_producto: item.tipo,
-    }))
+    }));
 
-    const { error: detailsError } = await supabase.from("detalle_pedido").insert(orderDetails)
+    const { error: detailsError } = await supabase.from("detalle_pedido").insert(orderDetails);
+    if (detailsError) throw detailsError;
 
-    if (detailsError) throw detailsError
-
-    // Crear notificaciones para productos dropshipping
-    const dropshippingItems = items.filter((item) => item.tipo === "dropshipping")
-
+    // Crear notificaciones para dropshipping
+    const dropshippingItems = items.filter((item) => item.tipo === "dropshipping");
     if (dropshippingItems.length > 0) {
-      const { data: distributors } = await supabase.from("usuarios").select("id").eq("rol", "distribuidor").limit(1)
-
+      const { data: distributors } = await supabase.from("usuarios").select("id").eq("rol", "distribuidor").limit(1);
       if (distributors && distributors.length > 0) {
         const notifications = dropshippingItems.map((item) => ({
           pedido_id: order.id,
           producto_id: item.producto_id,
           distribuidor_id: distributors[0].id,
           estado: "pendiente",
-        }))
-
-        await supabase.from("notificaciones_distribuidor").insert(notifications)
+        }));
+        await supabase.from("notificaciones_distribuidor").insert(notifications);
       }
     }
 
@@ -131,7 +129,7 @@ export default function CheckoutPage() {
       await supabase
         .from("productos")
         .update({
-          stock: supabase.raw(`stock - ${item.cantidad}`),
+          stock: (item: any) => item.stock - item.cantidad,
         })
         .eq("id", item.producto_id)
     }
@@ -139,34 +137,46 @@ export default function CheckoutPage() {
     return order
   }
 
+  // ========== SUBMIT ==========
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setErrors({})
-
-    if (!validateForm()) return
-
-    setProcessing(true)
+    e.preventDefault();
+    setErrors({});
+    if (!validateForm()) return;
+    setProcessing(true);
 
     try {
-      const order = await createOrder()
+      if (formData.payment_method === "webpay") {
+        // 1. FLUJO WEBPAY (NO crees el pedido aún, espera confirmación real de Transbank)
+        await handleWebpay();
+        return; // la redirección se hace por Webpay, no sigas
+      }
 
-      // Limpiar carrito
-      await clearCart()
-
+      // 2. FLUJO TRADICIONAL (transferencia, efectivo)
+      const order = await createOrder();
+      await clearCart();
       toast({
         title: "Pedido creado exitosamente",
         description: `Tu pedido #${order.id} ha sido procesado`,
-      })
-
-      router.push(`/orders/${order.id}`)
+      });
+      router.push(`/orders/${order.id}`);
     } catch (error: any) {
-      console.error("Error creating order:", error)
-      setErrors({ general: "No se pudo procesar el pedido. Intenta nuevamente." })
+      console.error("Error creando pedido:", error);
+      setErrors({ general: "No se pudo procesar el pedido. Intenta nuevamente." });
     } finally {
-      setProcessing(false)
+      setProcessing(false);
     }
-  }
+  };
 
+  // ========== VALIDACIÓN ==========
+  const validateForm = () => {
+    const newErrors: { shipping_address?: string, payment_method?: string } = {};
+    if (!formData.shipping_address.trim()) newErrors.shipping_address = "La dirección de envío es requerida";
+    if (!formData.payment_method) newErrors.payment_method = "Selecciona un método de pago";
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // ========== RENDER ==========
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col">
@@ -179,16 +189,13 @@ export default function CheckoutPage() {
     )
   }
 
-  if (!user || cartItems.length === 0) {
-    return null
-  }
+  if (!user || cartItems.length === 0) return null;
 
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
       <main className="flex-1 container mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold mb-8">Finalizar Compra</h1>
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Checkout Form */}
           <div>
@@ -198,7 +205,6 @@ export default function CheckoutPage() {
                   {errors.general}
                 </div>
               )}
-
               <Card>
                 <CardHeader>
                   <CardTitle>Información de Envío</CardTitle>
@@ -236,7 +242,7 @@ export default function CheckoutPage() {
                       <SelectContent>
                         <SelectItem value="transferencia">Transferencia Bancaria</SelectItem>
                         <SelectItem value="efectivo">Efectivo contra entrega</SelectItem>
-                        <SelectItem value="tarjeta">Tarjeta de Crédito/Débito</SelectItem>
+                        <SelectItem value="webpay">Webpay (Tarjeta crédito/débito)</SelectItem>
                       </SelectContent>
                     </Select>
                     {errors.payment_method && <p className="text-red-500 text-sm mt-1">{errors.payment_method}</p>}
@@ -266,9 +272,7 @@ export default function CheckoutPage() {
                     <p className="font-semibold">{formatPrice(item.product.precio * item.quantity)}</p>
                   </div>
                 ))}
-
                 <Separator />
-
                 <div className="flex justify-between">
                   <span>Subtotal</span>
                   <span>{formatPrice(getCartTotal())}</span>
@@ -277,9 +281,7 @@ export default function CheckoutPage() {
                   <span>Envío</span>
                   <span>Gratis</span>
                 </div>
-
                 <Separator />
-
                 <div className="flex justify-between font-semibold text-lg">
                   <span>Total</span>
                   <span>{formatPrice(getCartTotal())}</span>

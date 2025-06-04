@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAuth } from "@/components/providers/auth-provider"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
@@ -123,7 +121,7 @@ export default function AdminPage() {
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Panel de Administración</h1>
-          <Button onClick={() => router.push("/pos")}>Ir al Punto de Venta</Button>
+          <Button onClick={() => router.push("/admin/pos")}>Ir al Punto de Venta</Button>
         </div>
 
         {/* Stats Cards */}

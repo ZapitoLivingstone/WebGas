@@ -1,7 +1,7 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect } from "react"
+import { use } from "react"
+import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/providers/auth-provider"
 import { getProduct, updateProduct } from "@/lib/products"
@@ -27,38 +27,22 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
-interface Category {
-  id: number
-  nombre: string
-}
+// ⚠️ Aquí cambiamos el tipo de params
+export default function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params)
 
-interface Product {
-  id: number
-  nombre: string
-  descripcion: string | null
-  precio: number
-  stock: number | null
-  categoria_id: number | null
-  tipo: "propio" | "dropshipping"
-  activo: boolean
-  imagen_url: string | null
-  creado_por: string | null
-}
-
-export default function EditProductPage({ params }: { params: { id: string } }) {
   const { user, userRole, loading } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
-  const id = params.id;
 
   const [productId, setProductId] = useState<number | null>(null)
-  const [categories, setCategories] = useState<Category[]>([])
+  const [categories, setCategories] = useState<{ id: number; nombre: string }[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [imagePreview, setImagePreview] = useState<string>("")
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false)
-  const [formData, setFormData] = useState<Partial<Product>>({
+  const [formData, setFormData] = useState<Partial<any>>({
     nombre: "",
     descripcion: "",
     precio: 0,
@@ -78,9 +62,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
   useEffect(() => {
     if (id) {
       const pid = Number.parseInt(id)
-      if (!isNaN(pid)) {
-        setProductId(pid)
-      }
+      if (!isNaN(pid)) setProductId(pid)
     }
   }, [id])
 
@@ -89,6 +71,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
       fetchCategories()
       fetchProduct()
     }
+    // eslint-disable-next-line
   }, [user, userRole, productId])
 
   const fetchCategories = async () => {
@@ -106,13 +89,8 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
     try {
       setIsLoading(true)
       const product = await getProduct(productId)
-
       if (!product) {
-        toast({
-          title: "Error",
-          description: "Producto no encontrado",
-          variant: "destructive",
-        })
+        toast({ title: "Error", description: "Producto no encontrado", variant: "destructive" })
         router.push("/admin/products")
         return
       }
@@ -128,16 +106,10 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
         imagen_url: product.imagen_url || "",
       })
 
-      if (product.imagen_url) {
-        setImagePreview(product.imagen_url)
-      }
+      if (product.imagen_url) setImagePreview(product.imagen_url)
     } catch (error) {
       console.error("Error fetching product:", error)
-      toast({
-        title: "Error",
-        description: "No se pudo cargar el producto",
-        variant: "destructive",
-      })
+      toast({ title: "Error", description: "No se pudo cargar el producto", variant: "destructive" })
     } finally {
       setIsLoading(false)
     }
@@ -285,7 +257,6 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
       router.push("/admin/products")
     } catch (error: any) {
       let errorMessage = "No se pudo actualizar el producto"
-
       if (error instanceof Error) {
         errorMessage = error.message
       } else if (typeof error === "string") {
@@ -293,7 +264,6 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
       } else if (error?.message) {
         errorMessage = error.message
       }
-
       toast({
         title: "Error",
         description: errorMessage,
@@ -304,6 +274,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
     }
   }
 
+  // Loading state
   if (loading || isLoading) {
     return (
       <div className="min-h-screen flex flex-col">
@@ -320,6 +291,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
     return null
   }
 
+  // Render the form
   return (
     <div className="min-h-screen flex flex-col">
       <Header />

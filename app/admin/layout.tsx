@@ -28,7 +28,7 @@ function AdminTabs() {
     { value: "/admin/products", label: "Productos" },
     { value: "/admin/categories", label: "Categorías" },
     { value: "/admin/orders", label: "Pedidos" },
-    { value: "/admin/users", label: "Usuarios" },
+    { value: "/admin/ventas", label: "Ventas" }
   ]
 
   // Determinar la pestaña activa
