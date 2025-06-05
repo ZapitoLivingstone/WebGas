@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/providers/auth-provider"
@@ -35,12 +33,13 @@ export default function NewProductPage() {
   const [isUploading, setIsUploading] = useState(false)
   const [imagePreview, setImagePreview] = useState<string>("")
 
+  // Los valores numéricos como string para evitar el problema de borrar el 0
   const [formData, setFormData] = useState({
     nombre: "",
     descripcion: "",
-    precio: 0,
-    stock: 0,
-    categoria_id: 0,
+    precio: "",
+    stock: "",
+    categoria_id: "",
     tipo: "propio" as "propio" | "dropshipping",
     activo: true,
     imagen_url: "",
@@ -70,14 +69,12 @@ export default function NewProductPage() {
   const generateImageUrl = (productName: string, index = 0) => {
     const cleanName = productName.toLowerCase().replace(/[^a-z0-9]/g, "-")
     const seed = cleanName + index
-
     const services = [
       `https://picsum.photos/seed/${seed}/400/400`,
       `https://source.unsplash.com/400x400/?product,${cleanName}`,
       `https://via.placeholder.com/400x400/4F46E5/FFFFFF?text=${encodeURIComponent(productName)}`,
       `https://dummyimage.com/400x400/4F46E5/FFFFFF&text=${encodeURIComponent(productName)}`,
     ]
-
     return services[index % services.length]
   }
 
@@ -90,11 +87,9 @@ export default function NewProductPage() {
       })
       return
     }
-
     const newImageUrl = generateImageUrl(formData.nombre)
     setFormData((prev) => ({ ...prev, imagen_url: newImageUrl }))
     setImagePreview(newImageUrl)
-
     toast({
       title: "Imagen generada",
       description: "URL de imagen generada automáticamente",
@@ -133,9 +128,7 @@ export default function NewProductPage() {
     try {
       const localPreview = URL.createObjectURL(file)
       setImagePreview(localPreview)
-
       const imageUrl = await uploadImageToService(file)
-
       if (imageUrl) {
         setFormData((prev) => ({ ...prev, imagen_url: imageUrl }))
         toast({
@@ -161,67 +154,53 @@ export default function NewProductPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    console.log("=== CREATE PRODUCT DEBUG ===")
-    console.log("Form data:", formData)
-
-    if (!formData.nombre?.trim() || !formData.precio || !formData.categoria_id) {
-      toast({
-        title: "Error",
-        description: "Completa todos los campos obligatorios",
-        variant: "destructive",
-      })
-      return
-    }
-
-    // Validar stock para productos propios
-    if (formData.tipo === "propio" && (!formData.stock || formData.stock < 0)) {
-      toast({
-        title: "Error",
-        description: "Los productos propios requieren stock válido",
-        variant: "destructive",
-      })
-      return
-    }
-
     setIsSubmitting(true)
 
+    // Convertimos los campos numéricos
+    const precioNum = Number(formData.precio)
+    const stockNum = Number(formData.stock)
+    const categoriaNum = formData.categoria_id ? Number(formData.categoria_id) : null
+
+
+   if (!formData.nombre?.trim() || isNaN(precioNum) || precioNum < 0 || !categoriaNum) {
+       toast({ title: "Error", description: "Completa los campos obligatorios", variant: "destructive" })
+       setIsSubmitting(false)
+       return
+     }
+
     try {
-      // Preparar datos SOLO con campos que existen en la tabla
+      if (isNaN(precioNum)) {
+        toast({
+          title: "Error",
+          description: "El precio es obligatorio y debe ser un número válido",
+          variant: "destructive",
+        })
+        setIsSubmitting(false)
+        return
+      }
+
       const productData = {
         nombre: formData.nombre.trim(),
         descripcion: formData.descripcion?.trim() || null,
-        precio: Number(formData.precio),
-        stock: formData.tipo === "propio" ? Number(formData.stock) : null,
-        categoria_id: Number(formData.categoria_id),
+        precio: precioNum,
+        stock: formData.tipo === "propio" ? (isNaN(stockNum) ? null : stockNum) : null,
+        categoria_id: categoriaNum,
         tipo: formData.tipo as "propio" | "dropshipping",
         activo: Boolean(formData.activo),
         imagen_url: formData.imagen_url?.trim() || null,
       }
 
-      console.log("Submitting product data:", productData)
-
-      const result = await createProduct(productData)
-      console.log("Create result:", result)
-
+      await createProduct(productData)
       toast({
         title: "Producto creado",
         description: "El producto se ha creado exitosamente",
       })
-
       router.push("/admin/products")
     } catch (error: any) {
-      console.error("=== CREATE ERROR ===")
-      console.error("Full error object:", error)
-
       let errorMessage = "No se pudo crear el producto"
-
-      if (error instanceof Error) {
-        errorMessage = error.message
-      } else if (typeof error === "string") {
-        errorMessage = error
-      } else if (error?.message) {
-        errorMessage = error.message
-      }
+      if (error instanceof Error) errorMessage = error.message
+      else if (typeof error === "string") errorMessage = error
+      else if (error?.message) errorMessage = error.message
 
       toast({
         title: "Error",
@@ -267,7 +246,7 @@ export default function NewProductPage() {
               <CardDescription>Completa los datos del nuevo producto</CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form onSubmit={handleSubmit} className="space-y-6" autoComplete="off">
                 {/* Información básica */}
                 <div className="space-y-2">
                   <Label htmlFor="nombre">Nombre del Producto *</Label>
@@ -276,7 +255,7 @@ export default function NewProductPage() {
                     value={formData.nombre}
                     onChange={(e) => setFormData((prev) => ({ ...prev, nombre: e.target.value }))}
                     placeholder="Nombre del producto"
-                    required
+                    autoComplete="off"
                   />
                 </div>
 
@@ -288,6 +267,7 @@ export default function NewProductPage() {
                     onChange={(e) => setFormData((prev) => ({ ...prev, descripcion: e.target.value }))}
                     placeholder="Descripción del producto"
                     rows={3}
+                    autoComplete="off"
                   />
                 </div>
 
@@ -301,25 +281,25 @@ export default function NewProductPage() {
                       step="0.01"
                       min="0"
                       value={formData.precio}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, precio: Number.parseFloat(e.target.value) }))}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, precio: e.target.value }))}
                       placeholder="0.00"
-                      required
+                      autoComplete="off"
                     />
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="stock">
-                      Stock {formData.tipo === "propio" ? "*" : "(No aplica para dropshipping)"}
+                      Stock {formData.tipo === "propio" ? "" : "(No aplica para dropshipping)"}
                     </Label>
                     <Input
                       id="stock"
                       type="number"
                       min="0"
                       value={formData.stock}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, stock: Number.parseInt(e.target.value) }))}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, stock: e.target.value }))}
                       placeholder="0"
                       disabled={formData.tipo === "dropshipping"}
-                      required={formData.tipo === "propio"}
+                      autoComplete="off"
                     />
                     {formData.tipo === "dropshipping" && (
                       <p className="text-sm text-muted-foreground">Stock no aplica para productos dropshipping</p>
@@ -332,8 +312,9 @@ export default function NewProductPage() {
                   <div className="space-y-2">
                     <Label htmlFor="categoria">Categoría *</Label>
                     <Select
+                      value={formData.categoria_id}
                       onValueChange={(value) =>
-                        setFormData((prev) => ({ ...prev, categoria_id: Number.parseInt(value) }))
+                        setFormData((prev) => ({ ...prev, categoria_id: value }))
                       }
                     >
                       <SelectTrigger>
@@ -352,6 +333,7 @@ export default function NewProductPage() {
                   <div className="space-y-2">
                     <Label htmlFor="tipo">Tipo de Producto *</Label>
                     <Select
+                      value={formData.tipo}
                       onValueChange={(value) =>
                         setFormData((prev) => ({ ...prev, tipo: value as "propio" | "dropshipping" }))
                       }
@@ -370,7 +352,6 @@ export default function NewProductPage() {
                 {/* Imagen */}
                 <div className="space-y-4">
                   <Label>Imagen del Producto</Label>
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Subir imagen */}
                     <div className="space-y-2">
@@ -389,7 +370,6 @@ export default function NewProductPage() {
                         {isUploading && <Loader2 className="h-4 w-4 animate-spin" />}
                       </div>
                     </div>
-
                     {/* URL de imagen */}
                     <div className="space-y-2">
                       <Label htmlFor="image-url">URL de imagen</Label>
@@ -413,7 +393,6 @@ export default function NewProductPage() {
                       </div>
                     </div>
                   </div>
-
                   {imagePreview && (
                     <div className="relative w-32 h-32 border rounded-lg overflow-hidden">
                       <img

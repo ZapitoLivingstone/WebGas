@@ -23,7 +23,7 @@ export function HeroSection() {
               <Button
                 size="lg"
                 variant="outline"
-                className="border-white text-white hover:bg-white hover:text-blue-600"
+                className="border-white text-black hover:bg-white hover:text-blue-600"
                 asChild
               >
                 <Link href="/categories">Explorar Categorías</Link>
