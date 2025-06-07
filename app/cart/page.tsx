@@ -101,7 +101,9 @@ export default function CartPage() {
               {cartItems.map((item) => (
                 <Card key={item.product_id}>
                   <CardContent className="p-6">
-                    <div className="flex items-center space-x-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full">
+                    {/* Imagen */}
+                    <div className="mx-auto sm:mx-0 flex-shrink-0">
                       <Image
                         src={item.product.imagen_url || "/placeholder.svg"}
                         alt={item.product.nombre}
@@ -109,15 +111,19 @@ export default function CartPage() {
                         height={80}
                         className="rounded-lg object-cover"
                       />
+                    </div>
 
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-lg">{item.product.nombre}</h3>
-                        <p className="text-gray-600">{formatPrice(item.product.precio)}</p>
-                        {item.product.tipo === "propio" && item.product.stock !== null && (
-                          <p className="text-sm text-gray-500">Stock disponible: {item.product.stock}</p>
-                        )}
-                      </div>
+                    {/* Info */}
+                    <div className="flex-1 w-full min-w-0">
+                      <h3 className="font-semibold text-base sm:text-lg">{item.product.nombre}</h3>
+                      <p className="text-gray-600">{formatPrice(item.product.precio)}</p>
+                      {item.product.tipo === "propio" && item.product.stock !== null && (
+                        <p className="text-sm text-gray-500">Stock disponible: {item.product.stock}</p>
+                      )}
+                    </div>
 
+                    {/* Cantidad + Total + Quitar */}
+                    <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-0">
                       <div className="flex items-center space-x-2">
                         <Button
                           variant="outline"
@@ -131,7 +137,7 @@ export default function CartPage() {
                           type="number"
                           value={item.quantity}
                           onChange={(e) => handleQuantityChange(item.product_id, Number.parseInt(e.target.value) || 1)}
-                          className="w-16 text-center"
+                          className="w-14 text-center"
                           min="1"
                           max={item.product.stock || undefined}
                         />
@@ -148,9 +154,8 @@ export default function CartPage() {
                           <Plus className="h-4 w-4" />
                         </Button>
                       </div>
-
-                      <div className="text-right">
-                        <p className="font-semibold text-lg">{formatPrice(item.product.precio * item.quantity)}</p>
+                      <div className="mt-2 sm:mt-4 text-right min-w-[80px]">
+                        <p className="font-semibold text-base sm:text-lg">{formatPrice(item.product.precio * item.quantity)}</p>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -161,6 +166,8 @@ export default function CartPage() {
                         </Button>
                       </div>
                     </div>
+                  </div>
+
                   </CardContent>
                 </Card>
               ))}

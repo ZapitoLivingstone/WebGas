@@ -63,13 +63,21 @@ export default function ProductsPage() {
   }, [user, userRole])
 
   useEffect(() => {
-    const filtered = products.filter(
-      (product) =>
-        product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.categoria.nombre.toLowerCase().includes(searchTerm.toLowerCase()),
-    )
-    setFilteredProducts(filtered)
-  }, [products, searchTerm])
+  function normalizeString(str: string) {
+    return str
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim()
+  }
+  const search = normalizeString(searchTerm)
+  const filtered = products.filter((product) => {
+    const nombre = normalizeString(product.nombre)
+    const categoria = normalizeString(product.categoria.nombre)
+    return nombre.includes(search) || categoria.includes(search)
+  })
+  setFilteredProducts(filtered)
+}, [products, searchTerm])
 
   const fetchProducts = async () => {
     try {
@@ -172,13 +180,17 @@ export default function ProductsPage() {
     <div className="min-h-screen flex flex-col">
       <Header />
       <main className="flex-1 container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Gestión de Productos</h1>
-          <Button onClick={() => router.push("/admin/products/new")}>
-            <Plus className="h-4 w-4 mr-2" />
-            Agregar Producto
-          </Button>
-        </div>
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold">Gestión de Productos</h1>
+        <Button
+          onClick={() => router.push("/admin/products/new")}
+          className="w-full sm:w-auto"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Agregar Producto
+        </Button>
+      </div>
+
 
         {/* Búsqueda */}
         <Card className="mb-6">
@@ -196,7 +208,13 @@ export default function ProductsPage() {
         </Card>
 
         {/* Lista de productos */}
-        <div className="grid gap-4">
+        <div className="
+          grid 
+          gap-4 
+          grid-cols-1
+          sm:grid-cols-2 
+          xl:grid-cols-3
+        ">
           {filteredProducts.length === 0 ? (
             <Card>
               <CardContent className="pt-6 text-center">
@@ -207,11 +225,14 @@ export default function ProductsPage() {
             </Card>
           ) : (
             filteredProducts.map((product) => (
-              <Card key={product.id} className={!product.activo ? "opacity-75" : undefined}>
+              <Card
+                key={product.id}
+                className={`flex flex-col h-full justify-between ${!product.activo ? "opacity-75" : ""}`}
+              >
                 <CardContent className="pt-6">
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-col md:flex-row md:items-center gap-4">
                     {/* Imagen */}
-                    <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                    <div className="w-full md:w-16 h-32 md:h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 mx-auto md:mx-0">
                       {product.imagen_url ? (
                         <img
                           src={product.imagen_url || "/placeholder.svg"}
@@ -231,43 +252,57 @@ export default function ProductsPage() {
 
                     {/* Información */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="font-semibold text-lg truncate">{product.nombre}</h3>
-                          <p className="text-sm text-gray-600 mb-2">{product.categoria.nombre}</p>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <Badge variant={product.activo ? "default" : "secondary"}>
-                              {product.activo ? "Activo" : "Inactivo"}
-                            </Badge>
-                            <Badge variant="outline">{product.tipo === "propio" ? "Propio" : "Dropshipping"}</Badge>
-                            <span className="text-sm text-gray-500">Stock: {product.stock}</span>
-                          </div>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex flex-col sm:flex-row sm:justify-between">
+                          <h3 className="font-semibold text-base sm:text-lg truncate">{product.nombre}</h3>
+                          <p className="text-lg font-bold text-blue-600 mt-1 sm:mt-0">{formatPrice(product.precio)}</p>
                         </div>
-                        <div className="text-right">
-                          <p className="text-xl font-bold text-blue-600">{formatPrice(product.precio)}</p>
+                        <p className="text-sm text-gray-600 mb-2 break-words">{product.categoria.nombre}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant={product.activo ? "default" : "secondary"}>
+                            {product.activo ? "Activo" : "Inactivo"}
+                          </Badge>
+                          <Badge variant="outline">{product.tipo === "propio" ? "Propio" : "Dropshipping"}</Badge>
+                          <span className="text-sm text-gray-500">Stock: {product.stock}</span>
                         </div>
                       </div>
                     </div>
+                  </div>
 
-                    {/* Acciones */}
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" onClick={() => router.push(`/products/${product.id}`)}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => router.push(`/admin/products/${product.id}/edit`)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleToggleStatusClick(product)}>
-                        <Power className={`h-4 w-4 ${product.activo ? "text-green-500" : "text-gray-500"}`} />
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDeleteClick(product)}>
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    </div>
+                  {/* Acciones (responsive, apiladas en móvil, fila en desktop) */}
+                  <div className="flex flex-col sm:flex-row gap-2 mt-4 justify-end items-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/products/${product.id}`)}
+                      className="w-full sm:w-auto"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/admin/products/${product.id}/edit`)}
+                      className="w-full sm:w-auto"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleToggleStatusClick(product)}
+                      className="w-full sm:w-auto"
+                    >
+                      <Power className={`h-4 w-4 ${product.activo ? "text-green-500" : "text-gray-500"}`} />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteClick(product)}
+                      className="w-full sm:w-auto"
+                    >
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
