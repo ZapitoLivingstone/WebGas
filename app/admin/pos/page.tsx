@@ -163,12 +163,24 @@ export default function POSVentasPage() {
     setCart([]); setPaymentMethod(""); setEfectivoIngresado(""); setDescuentoGlobal(""); setShowDescuentoInput(false); fetchData(); setProcessingOrder(false)
   }
 
+  function normalize(str: string) {
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // Quita tildes
+    .toLowerCase()
+    .trim()
+}
   const formatPrice = (n: number) => new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP" }).format(n)
-  const filtered = products.filter(p => {
-    const matchesSearch = p.nombre.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCategory = selectedCategory ? p.categoria_id === selectedCategory : true
-    return matchesSearch && matchesCategory
-  })
+  const filtered = products.filter((p) => {
+  // Búsqueda flexible: nombre y categoría
+  const nombre = normalize(p.nombre)
+  const categoria = p.categoria_nombre ? normalize(p.categoria_nombre) : ""
+  const search = normalize(searchTerm)
+  const matchesSearch = nombre.includes(search) || categoria.includes(search)
+  const matchesCategory = selectedCategory ? p.categoria_id === selectedCategory : true
+  return matchesSearch && matchesCategory
+})
+
 
   if (userRole !== "admin") return <div className="p-8 text-center">Acceso denegado</div>
 
@@ -253,9 +265,9 @@ export default function POSVentasPage() {
         {/* Carrito y Pago */}
         <div className="lg:w-1/5 w-full flex flex-col space-y-4">
           <Card>
-            <CardHeader><CardTitle>Carrito</CardTitle></CardHeader>
+            <CardHeader><CardTitle></CardTitle></CardHeader>
             <CardContent>
-              {cart.length === 0 ? <p className="text-sm">Vacío</p> : (
+              {cart.length === 0 ? <p className="text-sm"></p> : (
                 <div className="space-y-2 max-h-[35vh] overflow-y-auto">
                   {cart.map((item) => (
                     <div key={item.product.id} className="flex justify-between items-center">

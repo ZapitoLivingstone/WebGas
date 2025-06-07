@@ -76,6 +76,14 @@ export default function VentasFiltradasPage() {
     setFilteredVentas(filtradas)
   }
 
+  // Nuevo: limpiar filtros y mostrar todo de nuevo
+  const limpiarFiltros = () => {
+    setFechaInicio("")
+    setFechaFin("")
+    setTipoVenta("")
+    setFilteredVentas(ventas)
+  }
+
   const formatPrice = (n: number) => new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP" }).format(n)
 
   return (
@@ -102,24 +110,52 @@ export default function VentasFiltradasPage() {
           </Select>
         </div>
         <Button onClick={filterVentas}>Filtrar</Button>
+        <Button onClick={limpiarFiltros} variant="outline" className="text-muted-foreground">
+          Limpiar filtros
+        </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-1 gap-5">
         {filteredVentas.map((venta) => (
-          <Card key={`${venta.origen}-${venta.id}`}>
-            <CardHeader className="flex justify-between items-center">
-              <CardTitle>Venta #{venta.id} ({venta.origen.toUpperCase()})</CardTitle>
-              <p className="text-sm text-muted-foreground">{format(new Date(venta.fecha), "dd-MM-yyyy HH:mm")}</p>
+          <Card
+            key={`${venta.origen}-${venta.id}`}
+            className="rounded-2xl shadow-md border border-gray-200 bg-gradient-to-br from-white to-gray-50 transition hover:scale-[1.01]"
+          >
+            <CardHeader className="flex flex-col md:flex-row md:justify-between md:items-center bg-blue-50/80 rounded-t-2xl py-4 px-6 border-b">
+              <CardTitle className="text-lg font-semibold">
+                Venta #{venta.id} <span className={venta.origen === "pos" ? "text-blue-600" : "text-purple-600"}>
+                  ({venta.origen === "pos" ? "POS" : "Internet"})
+                </span>
+              </CardTitle>
+              <p className="text-sm text-gray-500 font-mono">
+                {format(new Date(venta.fecha), "dd-MM-yyyy HH:mm")}
+              </p>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div><strong>Pago:</strong> {venta.metodo_pago}</div>
-              <div><strong>Bruto:</strong> {formatPrice(Number(venta.total_bruto))}</div>
-              <div><strong>Descuento:</strong> {formatPrice(Number(venta.descuento_total))}</div>
-              <div><strong>Total:</strong> {formatPrice(Number(venta.total_final))}</div>
+            <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 py-4 px-6 text-sm">
+              <div>
+                <span className="block font-medium text-gray-800">Pago</span>
+                <span className="text-gray-600">{venta.metodo_pago}</span>
+              </div>
+              <div>
+                <span className="block font-medium text-gray-800">Bruto</span>
+                <span className="text-gray-700">{formatPrice(Number(venta.total_bruto))}</span>
+              </div>
+              <div>
+                <span className="block font-medium text-gray-800">Descuento</span>
+                <span className="text-red-700">{formatPrice(Number(venta.descuento_total))}</span>
+              </div>
+              <div>
+                <span className="block font-medium text-gray-800">Total</span>
+                <span className="text-green-700 ">{formatPrice(Number(venta.total_final))}</span>
+              </div>
             </CardContent>
           </Card>
         ))}
-        {filteredVentas.length === 0 && <p className="text-sm text-muted-foreground">No hay ventas en este rango o tipo.</p>}
+        {filteredVentas.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            No hay ventas en este rango o tipo.
+          </p>
+        )}
       </div>
     </div>
   )

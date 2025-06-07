@@ -71,17 +71,28 @@ export default function CategoriesPage() {
   }, [user, userRole])
 
   useEffect(() => {
-    if (categories.length > 0) {
-      if (searchQuery.trim() === "") {
-        setFilteredCategories(categories)
-      } else {
-        const filtered = categories.filter((category) =>
-          category.nombre.toLowerCase().includes(searchQuery.toLowerCase()),
-        )
-        setFilteredCategories(filtered)
-      }
+  // Función para normalizar cadenas (ignora tildes y mayúsculas)
+  function normalizeString(str: string) {
+    return str
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim()
+  }
+
+  if (categories.length > 0) {
+    if (searchQuery.trim() === "") {
+      setFilteredCategories(categories)
+    } else {
+      const search = normalizeString(searchQuery)
+      const filtered = categories.filter((category) =>
+        normalizeString(category.nombre).includes(search)
+      )
+      setFilteredCategories(filtered)
     }
-  }, [categories, searchQuery])
+  }
+}, [categories, searchQuery])
+
 
   const loadCategories = async () => {
     try {
@@ -133,42 +144,52 @@ export default function CategoriesPage() {
   }
 
   const submitAddCategory = async () => {
-    if (!formData.nombre.trim()) {
-      toast({
-        title: "Error",
-        description: "El nombre de la categoría es obligatorio",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setIsSubmitting(true)
-
-    try {
-      const newCategory = {
-        nombre: formData.nombre.trim(),
-        descripcion: formData.descripcion.trim() || null,
-        icono: formData.icono.trim() || null,
-      }
-
-      await createCategory(newCategory)
-      setShowAddDialog(false)
-      toast({
-        title: "Categoría creada",
-        description: "La categoría se ha creado exitosamente",
-      })
-      loadCategories()
-    } catch (error) {
-      console.error("Error creating category:", error)
-      toast({
-        title: "Error",
-        description: "No se pudo crear la categoría",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSubmitting(false)
-    }
+  if (!formData.nombre.trim()) {
+    toast({
+      title: "Error",
+      description: "El nombre de la categoría es obligatorio",
+      variant: "destructive",
+    })
+    return
   }
+
+  setIsSubmitting(true)
+
+  try {
+    const newCategory = {
+      nombre: formData.nombre.trim(),
+      descripcion: formData.descripcion.trim() || null,
+      icono: formData.icono.trim() || null,
+    }
+
+    await createCategory(newCategory)
+    setShowAddDialog(false)
+    toast({
+      title: "Categoría creada",
+      description: "La categoría se ha creado exitosamente",
+    })
+    loadCategories()
+  } catch (error: any) {
+    // Chequeo especial para error de duplicado Postgres
+    if (error.code === "23505") {
+      toast({
+        title: "Categoría duplicada",
+        description: "Ya existe una categoría con ese nombre.",
+        variant: "destructive",
+      })
+    } else {
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo crear la categoría",
+        variant: "destructive",
+      })
+    }
+    console.error("Error creating category:", error)
+  } finally {
+    setIsSubmitting(false)
+  }
+}
+
 
   const submitEditCategory = async () => {
     if (!currentCategory) return
@@ -255,14 +276,29 @@ export default function CategoriesPage() {
       <Header />
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="max-w-5xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
-            <h1 className="text-3xl font-bold">Gestión de Categorías</h1>
-            <Button onClick={handleAddCategory}>
-              <Plus className="h-4 w-4 mr-2" />
-              Nueva Categoría
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-8">
+            <h1 className="text-2xl sm:text-3xl font-bold">Gestión de Categorías</h1>
+            <Button
+              onClick={handleAddCategory}
+              size="sm"
+              className="
+                w-full
+                sm:w-auto
+                flex items-center justify-center
+                gap-2
+                px-4 py-2
+                rounded-lg
+                text-base
+                font-semibold
+                shadow-sm
+                transition
+              "
+            >
+              <Plus className="h-5 w-5" />
+              <span className="hidden xs:inline">Nueva Categoría</span>
+              <span className="inline xs:hidden">Agregar</span>
             </Button>
           </div>
-
           <Card>
             <CardHeader>
               <CardTitle>Categorías</CardTitle>

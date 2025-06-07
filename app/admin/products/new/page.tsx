@@ -179,6 +179,8 @@ export default function NewProductPage() {
         return
       }
 
+      
+
       const productData = {
         nombre: formData.nombre.trim(),
         descripcion: formData.descripcion?.trim() || null,
@@ -188,6 +190,26 @@ export default function NewProductPage() {
         tipo: formData.tipo as "propio" | "dropshipping",
         activo: Boolean(formData.activo),
         imagen_url: formData.imagen_url?.trim() || null,
+      }
+
+      const { data: existing, error: existError } = await supabase
+        .from("productos")
+        .select("id")
+        .eq("nombre", productData.nombre)
+        .eq("tipo", productData.tipo)
+        .eq("categoria_id", productData.categoria_id)
+        .maybeSingle()
+
+      if (existError) throw existError
+
+      if (existing) {
+        toast({
+          title: "Error",
+          description: "Ya existe un producto con el mismo nombre, tipo y categoría.",
+          variant: "destructive",
+        })
+        setIsSubmitting(false)
+        return
       }
 
       await createProduct(productData)
