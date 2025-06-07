@@ -41,6 +41,7 @@ export default function ProductsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [sortBy, setSortBy] = useState("nombre")
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
   const [showFilters, setShowFilters] = useState(false)
   const searchParams = useSearchParams()
 
@@ -55,6 +56,24 @@ export default function ProductsPage() {
       setSelectedCategory(category)
     }
   }, [searchParams])
+
+  useEffect(() => {
+  function normalizeString(str: string) {
+    return str
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim()
+  }
+  const search = normalizeString(searchTerm)
+  setFilteredProducts(
+    products.filter((product) => {
+      const nombre = normalizeString(product.nombre)
+      const categoria = normalizeString(product.categoria?.nombre || "")
+      return nombre.includes(search) || categoria.includes(search)
+    })
+  )
+}, [products, searchTerm])
 
   useEffect(() => {
     fetchProducts()
@@ -74,43 +93,38 @@ export default function ProductsPage() {
   }
 
   const fetchProducts = async () => {
-    if (!supabase) return
+  if (!supabase) return
 
-    setLoading(true)
-    try {
-      let query = supabase
-        .from("productos")
-        .select(`
-          *,
-          categoria:categorias(id, nombre)
-        `)
-        .eq("activo", true)
+  setLoading(true)
+  try {
+    let query = supabase
+      .from("productos")
+      .select(`
+        *,
+        categoria:categorias(id, nombre)
+      `)
+      .eq("activo", true)
 
-      // Filtro por búsqueda
-      if (searchTerm) {
-        query = query.ilike("nombre", `%${searchTerm}%`)
-      }
-
-      // Filtro por categoría
-      if (selectedCategory !== "all") {
-        query = query.eq("categoria_id", Number.parseInt(selectedCategory))
-      }
-
-      // Ordenamiento
-      const ascending = sortBy !== "precio_desc"
-      const orderField = sortBy === "precio_desc" || sortBy === "precio_asc" ? "precio" : sortBy
-      query = query.order(orderField, { ascending })
-
-      const { data, error } = await query
-
-      if (error) throw error
-      setProducts(data || [])
-    } catch (error) {
-      console.error("Error fetching products:", error)
-    } finally {
-      setLoading(false)
+    // Filtro por categoría
+    if (selectedCategory !== "all") {
+      query = query.eq("categoria_id", Number.parseInt(selectedCategory))
     }
+
+    // Ordenamiento
+    const ascending = sortBy !== "precio_desc"
+    const orderField = sortBy === "precio_desc" || sortBy === "precio_asc" ? "precio" : sortBy
+    query = query.order(orderField, { ascending })
+
+    const { data, error } = await query
+
+    if (error) throw error
+    setProducts(data || [])
+  } catch (error) {
+    console.error("Error fetching products:", error)
+  } finally {
+    setLoading(false)
   }
+}
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -202,10 +216,10 @@ export default function ProductsPage() {
             ) : (
               <>
                 <div className="flex justify-between items-center mb-6">
-                  <p className="text-gray-600">{products.length} productos encontrados</p>
+                  <p className="text-gray-600">{filteredProducts.length} productos encontrados</p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {products.map((product) => (
+                  {filteredProducts.map((product) => (
                     <ProductCard key={product.id} product={product} />
                   ))}
                 </div>
