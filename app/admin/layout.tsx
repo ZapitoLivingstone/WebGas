@@ -12,10 +12,12 @@ interface AdminLayoutProps {
 export default function AdminLayout({ children }: AdminLayoutProps) {
   return (
     <>
-      <div className="container mx-auto px-4 py-4">
+      <div className="w-full max-w-full px-2 sm:px-4 py-3 sm:py-4">
         <AdminTabs />
       </div>
-      {children}
+      <div className="w-full max-w-7xl mx-auto px-2 sm:px-4">
+        {children}
+      </div>
     </>
   )
 }
@@ -33,18 +35,13 @@ function AdminTabs() {
 
   // Determinar la pestaña activa
   const getActiveTab = () => {
-    // Exact match
     const exactMatch = tabs.find((tab) => tab.value === pathname)
     if (exactMatch) return exactMatch.value
-
-    // Partial match (for nested routes)
     for (const tab of tabs) {
       if (pathname.startsWith(tab.value) && tab.value !== "/admin") {
         return tab.value
       }
     }
-
-    // Default to dashboard
     return "/admin"
   }
 
@@ -52,9 +49,22 @@ function AdminTabs() {
 
   return (
     <Tabs value={activeTab} className="w-full">
-      <TabsList className="w-full justify-start overflow-x-auto">
+      <TabsList
+        className="
+          w-full flex-nowrap flex overflow-x-auto gap-x-2 sm:gap-x-4
+          py-1 sm:py-2
+          bg-muted rounded-xl
+          no-scrollbar
+        "
+        style={{ WebkitOverflowScrolling: "touch" }}
+      >
         {tabs.map((tab) => (
-          <TabsTrigger key={tab.value} value={tab.value} asChild>
+          <TabsTrigger
+            key={tab.value}
+            value={tab.value}
+            asChild
+            className="min-w-[110px] sm:min-w-[130px] text-sm sm:text-base px-2 sm:px-4 whitespace-nowrap"
+          >
             <Link href={tab.value}>{tab.label}</Link>
           </TabsTrigger>
         ))}

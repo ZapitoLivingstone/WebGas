@@ -64,6 +64,7 @@ export default function POSVentasPage() {
       .from("productos")
       .select("*, categorias(nombre)")
       .eq("activo", true)
+      .eq("tipo", "propio")
 
     const { data: categoriasData, error: catError } = await supabase
       .from("categorias")
@@ -172,34 +173,77 @@ export default function POSVentasPage() {
   if (userRole !== "admin") return <div className="p-8 text-center">Acceso denegado</div>
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Punto de Venta (POS)</h1>
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+    <div className="w-full max-w-full px-2 sm:px-4 py-4 sm:py-8 mx-auto">
+      <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6">Punto de Venta (POS)</h1>
+      <div className="flex flex-col lg:flex-row gap-4">
         {/* Sidebar: Categorías */}
-        <div className="lg:col-span-1 space-y-4">
-          <div>
-            <Input placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-          </div>
-          <div>
-            <h2 className="text-md font-semibold">Categorías</h2>
-            <Button onClick={() => setSelectedCategory(null)} variant={!selectedCategory ? "default" : "outline"} size="sm" className="mb-1 w-full">Todas</Button>
-            {categories.map((cat) => (
-              <Button key={cat.id} onClick={() => setSelectedCategory(cat.id)} variant={selectedCategory === cat.id ? "default" : "outline"} size="sm" className="mb-1 w-full">
-                {cat.nombre}
+        <div className="lg:w-1/5 w-full flex-shrink-0">
+          <Input
+            placeholder="Buscar producto..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="mb-3"
+          />
+          {/* Categorías: Responsive - scroll horizontal en móvil, columna en desktop */}
+          <div className="mb-4">
+            <h2 className="text-md font-semibold mb-2">Categorías</h2>
+            {/* Horizontal scroll en móvil, columna en desktop */}
+            <div className="
+              flex
+              lg:flex-col
+              flex-row
+              gap-2
+              overflow-x-auto
+              pb-2
+              lg:overflow-x-visible
+              scrollbar-thin
+              scrollbar-thumb-rounded
+              scrollbar-thumb-gray-300
+            ">
+              <Button
+                onClick={() => setSelectedCategory(null)}
+                variant={!selectedCategory ? "default" : "outline"}
+                size="sm"
+                className="min-w-[100px] flex-shrink-0"
+              >
+                Todas
               </Button>
-            ))}
+              {categories.map((cat) => (
+                <Button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  variant={selectedCategory === cat.id ? "default" : "outline"}
+                  size="sm"
+                  className="min-w-[100px] flex-shrink-0"
+                >
+                  {cat.nombre}
+                </Button>
+              ))}
+            </div>
           </div>
+
         </div>
 
         {/* Productos */}
-        <div className="lg:col-span-2">
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 max-h-[70vh] overflow-y-auto">
-            {loading ? <p>Cargando...</p> : filtered.map((product) => (
-              <Card key={product.id} className="p-4 cursor-pointer hover:shadow" onClick={() => addToCart(product)}>
+        <div className="lg:w-3/5 w-full">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 max-h-[60vh] overflow-y-auto">
+            {loading ? <p>Cargando...</p> : filtered.length === 0 ? (
+              <p className="col-span-full text-center">No hay productos</p>
+            ) : filtered.map((product) => (
+              <Card key={product.id} className="p-3 cursor-pointer hover:shadow transition" onClick={() => addToCart(product)}>
+                {product.imagen_url && (
+                  <img
+                    src={product.imagen_url}
+                    alt={product.nombre}
+                    className="w-full h-24 object-cover rounded-lg mb-2"
+                  />
+                )}
                 <h3 className="font-semibold text-sm">{product.nombre}</h3>
                 <p className="text-blue-600 font-bold">{formatPrice(product.precio)}</p>
-                {product.tipo === "propio" && product.stock !== null && (
-                  <Badge variant={product.stock > 0 ? "secondary" : "destructive"}>Stock: {product.stock}</Badge>
+                {product.stock !== null && (
+                  <Badge variant={product.stock > 0 ? "secondary" : "destructive"}>
+                    Stock: {product.stock}
+                  </Badge>
                 )}
               </Card>
             ))}
@@ -207,16 +251,16 @@ export default function POSVentasPage() {
         </div>
 
         {/* Carrito y Pago */}
-        <div className="space-y-4">
+        <div className="lg:w-1/5 w-full flex flex-col space-y-4">
           <Card>
-            <CardHeader><CardTitle></CardTitle></CardHeader>
+            <CardHeader><CardTitle>Carrito</CardTitle></CardHeader>
             <CardContent>
-              {cart.length === 0 ? <p></p> : (
-                <div className="space-y-3 max-h-[50vh] overflow-y-auto">
+              {cart.length === 0 ? <p className="text-sm">Vacío</p> : (
+                <div className="space-y-2 max-h-[35vh] overflow-y-auto">
                   {cart.map((item) => (
                     <div key={item.product.id} className="flex justify-between items-center">
                       <div>
-                        <p className="text-sm font-medium">{item.product.nombre}</p>
+                        <p className="text-xs font-medium">{item.product.nombre}</p>
                         <p className="text-xs text-gray-500">{formatPrice(item.product.precio)} c/u</p>
                       </div>
                       <div className="flex items-center space-x-2">
@@ -226,12 +270,11 @@ export default function POSVentasPage() {
                       </div>
                     </div>
                   ))}
-                  <Separator className="my-4" />
+                  <Separator className="my-2" />
 
                   <Button onClick={() => setShowDescuentoInput(!showDescuentoInput)} variant="outline" size="sm" className="w-full">
                     <Tag className="h-4 w-4 mr-2" /> Aplicar descuento global
                   </Button>
-
                   {showDescuentoInput && (
                     <Input
                       placeholder="Ej: 10% o 1000"
@@ -239,7 +282,6 @@ export default function POSVentasPage() {
                       onChange={(e) => setDescuentoGlobal(e.target.value)}
                     />
                   )}
-
                   <p>Total: <strong>{formatPrice(getTotalFinal())}</strong></p>
                 </div>
               )}
@@ -259,7 +301,7 @@ export default function POSVentasPage() {
                 </SelectContent>
               </Select>
               {paymentMethod === 'efectivo' && (
-                <div className="mt-4">
+                <div className="mt-2">
                   <Input
                     type="text"
                     inputMode="numeric"
@@ -267,7 +309,7 @@ export default function POSVentasPage() {
                     value={efectivoIngresado}
                     onChange={(e) => setEfectivoIngresado(e.target.value)}
                   />
-                  <p className="text-sm mt-2">Vuelto: <strong>{formatPrice(vuelto >= 0 ? vuelto : 0)}</strong></p>
+                  <p className="text-xs mt-2">Vuelto: <strong>{formatPrice(vuelto >= 0 ? vuelto : 0)}</strong></p>
                 </div>
               )}
             </CardContent>

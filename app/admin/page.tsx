@@ -43,15 +43,12 @@ export default function AdminPage() {
 
   const fetchStats = async () => {
     try {
-      // Obtener estadísticas
       const [productsRes, usersRes, ordersRes] = await Promise.all([
         supabase.from("productos").select("id", { count: "exact" }),
         supabase.from("usuarios").select("id", { count: "exact" }),
         supabase.from("pedidos").select("id, total", { count: "exact" }),
       ])
-
       const totalRevenue = ordersRes.data?.reduce((sum, order) => sum + (order.total || 0), 0) || 0
-
       setStats({
         totalProducts: productsRes.count || 0,
         totalUsers: usersRes.count || 0,
@@ -95,10 +92,6 @@ export default function AdminPage() {
     }).format(price)
   }
 
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString("es-CL")
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col">
@@ -116,58 +109,65 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-muted">
       <Header />
-      <main className="flex-1 container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Panel de Administración</h1>
-          <Button onClick={() => router.push("/admin/pos")}>Ir al Punto de Venta</Button>
+      <main className="flex-1 w-full max-w-full px-2 sm:px-4 py-6 sm:py-8 mx-auto">
+        {/* Responsive Header */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold">Panel de Administración</h1>
+          <Button
+            className="w-full sm:w-auto"
+            onClick={() => router.push("/admin/pos")}
+          >
+            Ir al Punto de Venta
+          </Button>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 gap-y-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Productos</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-base font-medium">Total Productos</CardTitle>
+              <Package className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalProducts}</div>
+              <div className="text-xl sm:text-2xl font-bold">{stats.totalProducts}</div>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Usuarios</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-base font-medium">Total Usuarios</CardTitle>
+              <Users className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalUsers}</div>
+              <div className="text-xl sm:text-2xl font-bold">{stats.totalUsers}</div>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Pedidos</CardTitle>
-              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-base font-medium">Total Pedidos</CardTitle>
+              <ShoppingCart className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalOrders}</div>
+              <div className="text-xl sm:text-2xl font-bold">{stats.totalOrders}</div>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-base font-medium">Ingresos Totales</CardTitle>
+              <TrendingUp className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatPrice(stats.totalRevenue)}</div>
+              <div className="text-xl sm:text-2xl font-bold">{formatPrice(stats.totalRevenue)}</div>
             </CardContent>
           </Card>
         </div>
 
-
+        {/* Aquí puedes añadir tus tablas/listados con overflow-x-auto para que sean responsivos en móvil */}
+        {/* Ejemplo para el futuro: */}
+        {/* <div className="overflow-x-auto">
+              ...tu tabla aquí...
+            </div> */}
       </main>
       <Footer />
     </div>
