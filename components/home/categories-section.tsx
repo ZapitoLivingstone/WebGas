@@ -10,6 +10,7 @@ interface Category {
   id: number
   nombre: string
   product_count?: number
+  icono?: string | null
 }
 
 export function CategoriesSection() {
@@ -33,7 +34,7 @@ export function CategoriesSection() {
         .select(`
           id,
           nombre,
-          productos!inner(count)
+          icono
         `)
         .order("nombre")
 
@@ -103,11 +104,16 @@ export function CategoriesSection() {
               <Card className="hover:shadow-lg transition-shadow cursor-pointer">
                 <CardContent className="p-6 text-center">
                   <Image
-                    src={`/placeholder.svg?height=120&width=120&text=${encodeURIComponent(category.nombre)}`}
+                    src={
+                      category.icono && category.icono.trim() !== ""
+                        ? category.icono
+                        : `/placeholder.svg?height=120&width=120&text=${encodeURIComponent(category.nombre)}`
+                    }
                     alt={category.nombre}
                     width={120}
                     height={120}
-                    className="mx-auto mb-4 rounded-lg"
+                    className="mx-auto mb-4 rounded-lg object-cover bg-white"
+                    unoptimized // quita esto si tu ícono viene de un dominio permitido por next.config.js
                   />
                   <h3 className="font-semibold text-lg mb-2">{category.nombre}</h3>
                   <p className="text-gray-500 text-sm">{category.product_count || 0} productos</p>

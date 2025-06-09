@@ -290,6 +290,7 @@ export default function NewProductPage() {
                     placeholder="Descripción del producto"
                     rows={3}
                     autoComplete="off"
+                    className="resize-none"
                   />
                 </div>
 

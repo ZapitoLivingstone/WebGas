@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/providers/auth-provider"
 import {
@@ -16,19 +16,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { useToast } from "@/hooks/use-toast"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Plus, Pencil, Trash2, Loader2, Search, X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { useToast } from "@/hooks/use-toast"
+import { IconUploader } from "@/components/category/IconUploader" // <= INCORPORA TU COMPONENTE AQUÍ
 
 interface Category {
   id: number
@@ -58,6 +52,8 @@ export default function CategoriesPage() {
     icono: "",
   })
 
+  // --- EFECTOS ---
+
   useEffect(() => {
     if (!loading && (!user || userRole !== "admin")) {
       router.push("/")
@@ -71,28 +67,27 @@ export default function CategoriesPage() {
   }, [user, userRole])
 
   useEffect(() => {
-  // Función para normalizar cadenas (ignora tildes y mayúsculas)
-  function normalizeString(str: string) {
-    return str
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase()
-      .trim()
-  }
-
-  if (categories.length > 0) {
-    if (searchQuery.trim() === "") {
-      setFilteredCategories(categories)
-    } else {
-      const search = normalizeString(searchQuery)
-      const filtered = categories.filter((category) =>
-        normalizeString(category.nombre).includes(search)
-      )
-      setFilteredCategories(filtered)
+    function normalizeString(str: string) {
+      return str
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim()
     }
-  }
-}, [categories, searchQuery])
+    if (categories.length > 0) {
+      if (searchQuery.trim() === "") {
+        setFilteredCategories(categories)
+      } else {
+        const search = normalizeString(searchQuery)
+        const filtered = categories.filter((category) =>
+          normalizeString(category.nombre).includes(search)
+        )
+        setFilteredCategories(filtered)
+      }
+    }
+  }, [categories, searchQuery])
 
+  // --- CRUD ---
 
   const loadCategories = async () => {
     try {
@@ -100,8 +95,6 @@ export default function CategoriesPage() {
       const data = await getCategories()
       setCategories(data)
       setFilteredCategories(data)
-
-      // Cargar conteo de productos para cada categoría
       const counts: Record<number, number> = {}
       for (const category of data) {
         counts[category.id] = await getCategoryProductCount(category.id)
@@ -119,12 +112,10 @@ export default function CategoriesPage() {
     }
   }
 
+  // --- HANDLERS FORM ---
+
   const handleAddCategory = () => {
-    setFormData({
-      nombre: "",
-      descripcion: "",
-      icono: "",
-    })
+    setFormData({ nombre: "", descripcion: "", icono: "" })
     setShowAddDialog(true)
   }
 
@@ -144,52 +135,44 @@ export default function CategoriesPage() {
   }
 
   const submitAddCategory = async () => {
-  if (!formData.nombre.trim()) {
-    toast({
-      title: "Error",
-      description: "El nombre de la categoría es obligatorio",
-      variant: "destructive",
-    })
-    return
-  }
-
-  setIsSubmitting(true)
-
-  try {
-    const newCategory = {
-      nombre: formData.nombre.trim(),
-      descripcion: formData.descripcion.trim() || null,
-      icono: formData.icono.trim() || null,
-    }
-
-    await createCategory(newCategory)
-    setShowAddDialog(false)
-    toast({
-      title: "Categoría creada",
-      description: "La categoría se ha creado exitosamente",
-    })
-    loadCategories()
-  } catch (error: any) {
-    // Chequeo especial para error de duplicado Postgres
-    if (error.code === "23505") {
-      toast({
-        title: "Categoría duplicada",
-        description: "Ya existe una categoría con ese nombre.",
-        variant: "destructive",
-      })
-    } else {
+    if (!formData.nombre.trim()) {
       toast({
         title: "Error",
-        description: error.message || "No se pudo crear la categoría",
+        description: "El nombre de la categoría es obligatorio",
         variant: "destructive",
       })
+      return
     }
-    console.error("Error creating category:", error)
-  } finally {
-    setIsSubmitting(false)
+    setIsSubmitting(true)
+    try {
+      const newCategory = {
+        nombre: formData.nombre.trim(),
+        descripcion: formData.descripcion.trim() || null,
+        icono: formData.icono.trim() || null,
+      }
+      await createCategory(newCategory)
+      setShowAddDialog(false)
+      toast({ title: "Categoría creada", description: "La categoría se ha creado exitosamente" })
+      loadCategories()
+    } catch (error: any) {
+      if (error.code === "23505") {
+        toast({
+          title: "Categoría duplicada",
+          description: "Ya existe una categoría con ese nombre.",
+          variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: error.message || "No se pudo crear la categoría",
+          variant: "destructive",
+        })
+      }
+      console.error("Error creating category:", error)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
-}
-
 
   const submitEditCategory = async () => {
     if (!currentCategory) return
@@ -201,22 +184,16 @@ export default function CategoriesPage() {
       })
       return
     }
-
     setIsSubmitting(true)
-
     try {
       const updatedCategory = {
         nombre: formData.nombre.trim(),
         descripcion: formData.descripcion.trim() || null,
         icono: formData.icono.trim() || null,
       }
-
       await updateCategory(currentCategory.id, updatedCategory)
       setShowEditDialog(false)
-      toast({
-        title: "Categoría actualizada",
-        description: "La categoría se ha actualizado exitosamente",
-      })
+      toast({ title: "Categoría actualizada", description: "La categoría se ha actualizado exitosamente" })
       loadCategories()
     } catch (error) {
       console.error("Error updating category:", error)
@@ -232,16 +209,11 @@ export default function CategoriesPage() {
 
   const submitDeleteCategory = async () => {
     if (!currentCategory) return
-
     setIsSubmitting(true)
-
     try {
       await deleteCategory(currentCategory.id)
       setShowDeleteDialog(false)
-      toast({
-        title: "Categoría eliminada",
-        description: "La categoría se ha eliminado exitosamente",
-      })
+      toast({ title: "Categoría eliminada", description: "La categoría se ha eliminado exitosamente" })
       loadCategories()
     } catch (error: any) {
       console.error("Error deleting category:", error)
@@ -271,6 +243,7 @@ export default function CategoriesPage() {
     return null
   }
 
+  // --- RENDER ---
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
@@ -278,25 +251,8 @@ export default function CategoriesPage() {
         <div className="max-w-5xl mx-auto">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-8">
             <h1 className="text-2xl sm:text-3xl font-bold">Gestión de Categorías</h1>
-            <Button
-              onClick={handleAddCategory}
-              size="sm"
-              className="
-                w-full
-                sm:w-auto
-                flex items-center justify-center
-                gap-2
-                px-4 py-2
-                rounded-lg
-                text-base
-                font-semibold
-                shadow-sm
-                transition
-              "
-            >
-              <Plus className="h-5 w-5" />
-              <span className="hidden xs:inline">Nueva Categoría</span>
-              <span className="inline xs:hidden">Agregar</span>
+            <Button onClick={handleAddCategory} size="sm" className="w-full sm:w-auto flex items-center gap-2">
+              <Plus className="h-5 w-5" /> Nueva Categoría
             </Button>
           </div>
           <Card>
@@ -336,6 +292,7 @@ export default function CategoriesPage() {
                     <TableRow>
                       <TableHead>Nombre</TableHead>
                       <TableHead>Descripción</TableHead>
+                      <TableHead>Icono</TableHead>
                       <TableHead>Productos</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
@@ -345,6 +302,13 @@ export default function CategoriesPage() {
                       <TableRow key={category.id}>
                         <TableCell className="font-medium">{category.nombre}</TableCell>
                         <TableCell>{category.descripcion || "-"}</TableCell>
+                        <TableCell>
+                          {category.icono ? (
+                            <img src={category.icono} alt="icono" className="w-8 h-8 object-cover rounded" />
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Badge variant="outline">{productCounts[category.id] || 0}</Badge>
                         </TableCell>
@@ -379,7 +343,7 @@ export default function CategoriesPage() {
       </main>
       <Footer />
 
-      {/* Modal para agregar categoría */}
+      {/* --- MODAL AGREGAR --- */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent>
           <DialogHeader>
@@ -404,17 +368,14 @@ export default function CategoriesPage() {
                 onChange={(e) => setFormData((prev) => ({ ...prev, descripcion: e.target.value }))}
                 placeholder="Descripción de la categoría"
                 rows={3}
+                className="resize-none"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="icono">Icono (opcional)</Label>
-              <Input
-                id="icono"
-                value={formData.icono}
-                onChange={(e) => setFormData((prev) => ({ ...prev, icono: e.target.value }))}
-                placeholder="Nombre del icono o URL"
-              />
-            </div>
+            <IconUploader
+              iconUrl={formData.icono}
+              setIconUrl={url => setFormData(prev => ({ ...prev, icono: url }))}
+              label="Icono de la categoría (opcional)"
+            />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddDialog(false)} disabled={isSubmitting}>
@@ -434,7 +395,7 @@ export default function CategoriesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal para editar categoría */}
+      {/* --- MODAL EDITAR --- */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent>
           <DialogHeader>
@@ -459,17 +420,14 @@ export default function CategoriesPage() {
                 onChange={(e) => setFormData((prev) => ({ ...prev, descripcion: e.target.value }))}
                 placeholder="Descripción de la categoría"
                 rows={3}
+                className="resize-none"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-icono">Icono (opcional)</Label>
-              <Input
-                id="edit-icono"
-                value={formData.icono}
-                onChange={(e) => setFormData((prev) => ({ ...prev, icono: e.target.value }))}
-                placeholder="Nombre del icono o URL"
-              />
-            </div>
+            <IconUploader
+              iconUrl={formData.icono}
+              setIconUrl={url => setFormData(prev => ({ ...prev, icono: url }))}
+              label="Icono de la categoría (opcional)"
+            />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={isSubmitting}>
@@ -489,7 +447,7 @@ export default function CategoriesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal para eliminar categoría */}
+      {/* --- MODAL ELIMINAR --- */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
           <DialogHeader>
@@ -498,8 +456,7 @@ export default function CategoriesPage() {
               ¿Estás seguro de que deseas eliminar la categoría "{currentCategory?.nombre}"?
               {productCounts[currentCategory?.id || 0] > 0 && (
                 <div className="mt-2 text-red-500">
-                  Esta categoría tiene {productCounts[currentCategory?.id || 0]} productos asociados y no puede ser
-                  eliminada. Debes reasignar o eliminar los productos primero.
+                  Esta categoría tiene {productCounts[currentCategory?.id || 0]} productos asociados y no puede ser eliminada. Debes reasignar o eliminar los productos primero.
                 </div>
               )}
             </DialogDescription>

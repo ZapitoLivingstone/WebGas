@@ -55,8 +55,12 @@ function AdminTabs() {
           py-1 sm:py-2
           bg-muted rounded-xl
           no-scrollbar
+          min-w-0
         "
-        style={{ WebkitOverflowScrolling: "touch" }}
+        style={{
+          WebkitOverflowScrolling: "touch",
+          overflowY: "hidden", // solo scroll horizontal
+        }}
       >
         {tabs.map((tab) => (
           <TabsTrigger
@@ -69,6 +73,7 @@ function AdminTabs() {
           </TabsTrigger>
         ))}
       </TabsList>
+
     </Tabs>
   )
 }

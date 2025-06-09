@@ -331,6 +331,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
                     onChange={(e) => setFormData((prev) => ({ ...prev, descripcion: e.target.value }))}
                     placeholder="Descripción del producto"
                     rows={3}
+                    className="resize-none"
                   />
                 </div>
 
