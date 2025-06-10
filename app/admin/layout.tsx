@@ -12,10 +12,10 @@ interface AdminLayoutProps {
 export default function AdminLayout({ children }: AdminLayoutProps) {
   return (
     <>
-      <div className="w-full max-w-full px-2 sm:px-4 py-3 sm:py-4">
+      <div className="w-full max-w-full  sm:px-4 py-3 sm:py-4">
         <AdminTabs />
       </div>
-      <div className="w-full max-w-7xl mx-auto px-2 sm:px-4">
+      <div className="">
         {children}
       </div>
     </>
@@ -51,7 +51,7 @@ function AdminTabs() {
     <Tabs value={activeTab} className="w-full">
       <TabsList
         className="
-          w-full flex-nowrap flex overflow-x-auto gap-x-2 sm:gap-x-4
+          flex-nowrap flex overflow-x-auto  sm:gap-x-4
           py-1 sm:py-2
           bg-muted rounded-xl
           no-scrollbar

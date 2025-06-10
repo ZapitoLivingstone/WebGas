@@ -101,8 +101,8 @@ export function CategoriesSection() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           {categories.map((category) => (
             <Link key={category.id} href={`/products?categoria=${category.id}`}>
-              <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-                <CardContent className="p-6 text-center">
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full flex flex-col">
+                <div className="relative w-full h-32 flex-shrink-0 rounded-t-xl overflow-hidden bg-white">
                   <Image
                     src={
                       category.icono && category.icono.trim() !== ""
@@ -110,11 +110,12 @@ export function CategoriesSection() {
                         : `/placeholder.svg?height=120&width=120&text=${encodeURIComponent(category.nombre)}`
                     }
                     alt={category.nombre}
-                    width={120}
-                    height={120}
-                    className="mx-auto mb-4 rounded-lg object-cover bg-white"
-                    unoptimized // quita esto si tu ícono viene de un dominio permitido por next.config.js
+                    fill // Esto hace que la imagen llene el contenedor usando absolute
+                    className="object-cover object-center w-full h-full"
+                    unoptimized // o quita si usas dominio permitido
                   />
+                </div>
+                <CardContent className="flex-1 flex flex-col items-center justify-center py-4">
                   <h3 className="font-semibold text-lg mb-2">{category.nombre}</h3>
                   <p className="text-gray-500 text-sm">{category.product_count || 0} productos</p>
                 </CardContent>

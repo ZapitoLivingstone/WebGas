@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Header } from "@/components/layout/header"
+import {Footer} from "@/components/layout/footer"
 import { supabase } from "@/lib/supabase"
 
 interface Categoria {
+  icono?: string | null // URL del icono de la categoría
   id: number
   nombre: string
   descripcion?: string // Si quieres usar descripciones luego
@@ -27,6 +30,8 @@ export default function CategoriesPage() {
         .select(`
           id,
           nombre,
+          icono,
+          descripcion,
           productos:productos(count)
         `)
         .order("nombre")
@@ -41,6 +46,8 @@ export default function CategoriesPage() {
         id: cat.id,
         nombre: cat.nombre,
         productCount: cat.productos?.length > 0 ? cat.productos[0].count : 0,
+        icono: cat.icono || null,
+        descripcion: cat.descripcion || "",
       }))
       setCategories(withCount)
       setLoading(false)
@@ -65,11 +72,19 @@ export default function CategoriesPage() {
           {categories.map((category) => (
             <Link key={category.id} href={`/products?categoria=${category.id}`}>
               <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full flex flex-col">
-                {/* Imagen opcional: solo si la agregas después a la base de datos */}
-                {/* <div
-                  className="h-48 bg-gray-200 bg-cover bg-center rounded-t-lg"
-                  style={{ backgroundImage: `url(${category.image || "/placeholder.svg"})` }}
-                /> */}
+                <div className="relative w-full h-32 rounded-t-xl overflow-hidden bg-white">
+                  <Image
+                    src={
+                      category.icono && category.icono.trim() !== ""
+                        ? category.icono
+                        : `/placeholder.svg?height=120&width=120&text=${encodeURIComponent(category.nombre)}`
+                    }
+                    alt={category.nombre}
+                    fill
+                    className="object-cover object-center w-full h-full"
+                    unoptimized
+                  />
+                </div>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-xl">{category.nombre}</CardTitle>
@@ -80,10 +95,13 @@ export default function CategoriesPage() {
                   <p className="text-gray-600">{category.descripcion || ""}</p>
                 </CardContent>
               </Card>
+
             </Link>
+
           ))}
         </div>
       )}
     </div>
+    
   )
 }
