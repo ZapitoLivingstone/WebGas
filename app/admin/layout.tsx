@@ -12,7 +12,7 @@ interface AdminLayoutProps {
 export default function AdminLayout({ children }: AdminLayoutProps) {
   return (
     <>
-      <div className="w-full max-w-full  sm:px-4 py-3 sm:py-4">
+      <div className="w-screen -mx-4 sm:w-full sm:mx-0 py-3 sm:py-4">
         <AdminTabs />
       </div>
       <div className="">
@@ -24,7 +24,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
 function AdminTabs() {
   const pathname = usePathname()
-
   const tabs = [
     { value: "/admin", label: "Dashboard" },
     { value: "/admin/products", label: "Productos" },
@@ -33,7 +32,6 @@ function AdminTabs() {
     { value: "/admin/ventas", label: "Ventas" }
   ]
 
-  // Determinar la pestaña activa
   const getActiveTab = () => {
     const exactMatch = tabs.find((tab) => tab.value === pathname)
     if (exactMatch) return exactMatch.value
@@ -48,32 +46,48 @@ function AdminTabs() {
   const activeTab = getActiveTab()
 
   return (
-    <Tabs value={activeTab} className="w-full">
-      <TabsList
-        className="
-          flex-nowrap flex overflow-x-auto  sm:gap-x-4
-          py-1 sm:py-2
-          bg-muted rounded-xl
-          no-scrollbar
-          min-w-0
-        "
-        style={{
-          WebkitOverflowScrolling: "touch",
-          overflowY: "hidden", // solo scroll horizontal
-        }}
-      >
-        {tabs.map((tab) => (
-          <TabsTrigger
-            key={tab.value}
-            value={tab.value}
-            asChild
-            className="min-w-[110px] sm:min-w-[130px] text-sm sm:text-base px-2 sm:px-4 whitespace-nowrap"
-          >
-            <Link href={tab.value}>{tab.label}</Link>
-          </TabsTrigger>
-        ))}
-      </TabsList>
-
-    </Tabs>
+    <div className="overflow-x-auto no-scrollbar px-1 sm:px-0 w-full">
+      <Tabs value={activeTab} className="w-full">
+        <TabsList
+          className="
+            flex flex-nowrap overflow-x-auto no-scrollbar w-full
+            bg-muted rounded-xl gap-1 sm:gap-3 md:gap-6
+            py-1 sm:py-2
+            snap-x
+          "
+          style={{
+            WebkitOverflowScrolling: "touch",
+            overflowY: "hidden",
+          }}
+        >
+          {tabs.map((tab, idx) => (
+            <TabsTrigger
+              key={tab.value}
+              value={tab.value}
+              asChild
+              className={`
+                min-w-[60px] max-w-[80px]
+                sm:min-w-[120px] sm:max-w-[180px] 
+                md:min-w-[160px] md:max-w-[240px]
+                px-1 sm:px-4 md:px-6
+                py-2
+                text-[12px] sm:text-base md:text-lg
+                whitespace-nowrap
+                text-center
+                snap-start
+                ${idx === 0 ? "ml-4" : ""}
+                ${idx === tabs.length - 1 ? "mr-1" : ""}
+              `}
+            >
+              <Link href={tab.value}>{tab.label}</Link>
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+    </div>
   )
 }
+
+
+
+

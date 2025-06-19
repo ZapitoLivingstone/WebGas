@@ -145,6 +145,11 @@ export default function LoginPage() {
               </Link>
             </p>
           </div>
+          <div className="mt-4 text-center">
+            <Link href="/auth/forgot-password" className="text-blue-600 hover:underline text-sm">
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </div>
