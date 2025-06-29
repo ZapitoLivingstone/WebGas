@@ -10,10 +10,10 @@ import {Footer} from "@/components/layout/footer"
 import { supabase } from "@/lib/supabase"
 
 interface Categoria {
-  icono?: string | null // URL del icono de la categoría
+  icono?: string | null 
   id: number
   nombre: string
-  descripcion?: string // Si quieres usar descripciones luego
+  descripcion?: string
   productCount: number
 }
 

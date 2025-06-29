@@ -44,6 +44,9 @@ export default function ProductsPage() {
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [isLoading, setIsLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize] = useState(6)
+  const [selectedCategory, setSelectedCategory] = useState("Todas")
 
   // Estados para modales
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -62,22 +65,26 @@ export default function ProductsPage() {
     }
   }, [user, userRole])
 
+  // Actualiza el filtro y paginación según búsqueda y categoría
   useEffect(() => {
-  function normalizeString(str: string) {
-    return str
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase()
-      .trim()
-  }
-  const search = normalizeString(searchTerm)
-  const filtered = products.filter((product) => {
-    const nombre = normalizeString(product.nombre)
-    const categoria = normalizeString(product.categoria.nombre)
-    return nombre.includes(search) || categoria.includes(search)
-  })
-  setFilteredProducts(filtered)
-}, [products, searchTerm])
+    function normalizeString(str: string) {
+      return str
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim()
+    }
+    const search = normalizeString(searchTerm)
+    const filtered = products.filter((product) => {
+      const nombre = normalizeString(product.nombre)
+      const categoria = normalizeString(product.categoria.nombre)
+      const matchSearch = nombre.includes(search) || categoria.includes(search)
+      const matchCategory = selectedCategory === "Todas" || categoria === normalizeString(selectedCategory)
+      return matchSearch && matchCategory
+    })
+    setFilteredProducts(filtered)
+    setCurrentPage(1) // Reinicia la página cuando se filtra
+  }, [products, searchTerm, selectedCategory])
 
   const fetchProducts = async () => {
     try {
@@ -95,6 +102,16 @@ export default function ProductsPage() {
       setIsLoading(false)
     }
   }
+
+  // Saca las categorías únicas
+  const categories = Array.from(new Set(products.map(p => p.categoria.nombre))).sort()
+
+  // Paginación
+  const totalPages = Math.ceil(filteredProducts.length / pageSize)
+  const paginatedProducts = filteredProducts.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  )
 
   const handleDeleteClick = (product: Product) => {
     setSelectedProduct(product)
@@ -181,19 +198,18 @@ export default function ProductsPage() {
       <Header />
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold">Gestión de Productos</h1>
-        <Button
-          onClick={() => router.push("/admin/products/new")}
-          className="w-full sm:w-auto"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Agregar Producto
-        </Button>
-      </div>
-
+          <h1 className="text-2xl sm:text-3xl font-bold">Gestión de Productos</h1>
+          <Button
+            onClick={() => router.push("/admin/products/new")}
+            className="w-full sm:w-auto"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Agregar Producto
+          </Button>
+        </div>
 
         {/* Búsqueda */}
-        <Card className="mb-6">
+        <Card className="mb-4">
           <CardContent className="pt-6">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -207,24 +223,66 @@ export default function ProductsPage() {
           </CardContent>
         </Card>
 
-        {/* Lista de productos */}
-        <div className="
-          grid 
-          gap-4 
-          grid-cols-1
-          sm:grid-cols-2 
-          xl:grid-cols-3
-        ">
-          {filteredProducts.length === 0 ? (
+        {/* Filtro de categorías */}
+        <div
+          className="
+            mb-6 
+            flex 
+            flex-nowrap 
+            overflow-x-auto 
+            no-scrollbar 
+            gap-2 
+            py-1
+            -mx-2 px-2
+            sm:overflow-x-visible
+            sm:flex-wrap
+            sm:gap-3
+          "
+        >
+          <Button
+            variant={selectedCategory === "Todas" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSelectedCategory("Todas")}
+            className="flex-shrink-0"
+          >
+            Todas
+          </Button>
+          {categories.map((cat) => (
+            <Button
+              key={cat}
+              variant={selectedCategory === cat ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedCategory(cat)}
+              className="flex-shrink-0"
+            >
+              {cat}
+            </Button>
+          ))}
+        </div>
+
+
+        {/* Lista de productos paginada */}
+        <div
+          className="
+            grid
+            gap-4
+            grid-cols-1
+            sm:grid-cols-2
+            xl:grid-cols-3
+          "
+        >
+          {paginatedProducts.length === 0 ? (
             <Card>
               <CardContent className="pt-6 text-center">
                 <p className="text-gray-500">
-                  {searchTerm ? "No se encontraron productos" : "No hay productos registrados"}
+                  {searchTerm || selectedCategory !== "Todas"
+                    ? "No se encontraron productos"
+                    : "No hay productos registrados"}
                 </p>
               </CardContent>
             </Card>
           ) : (
-            filteredProducts.map((product) => (
+            paginatedProducts.map((product) => (
               <Card
                 key={product.id}
                 className={`flex flex-col h-full justify-between ${!product.activo ? "opacity-75" : ""}`}
@@ -269,7 +327,7 @@ export default function ProductsPage() {
                     </div>
                   </div>
 
-                  {/* Acciones (responsive, apiladas en móvil, fila en desktop) */}
+                  {/* Acciones */}
                   <div className="flex flex-col sm:flex-row gap-2 mt-4 justify-end items-end">
                     <Button
                       variant="outline"
@@ -309,6 +367,30 @@ export default function ProductsPage() {
             ))
           )}
         </div>
+
+        {/* Paginación */}
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-2 mt-6">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              Anterior
+            </Button>
+            <span className="text-sm font-medium">Página {currentPage} de {totalPages}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              Siguiente
+            </Button>
+          </div>
+        )}
+
       </main>
       <Footer />
 

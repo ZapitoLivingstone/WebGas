@@ -4,39 +4,44 @@ import Image from "next/image"
 
 export function HeroSection() {
   return (
-    <section className="bg-gradient-to-r from-blue-600 to-blue-800 text-white">
-      <div className="container mx-auto px-4 py-20">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          <div>
-            <h1 className="text-4xl lg:text-6xl font-bold mb-6">
-              Todo para tu
-              <span className="block text-yellow-400">Proyecto de Plomería</span>
+    <section className="w-full">
+      {/* SACAMOS el container, usamos w-full */}
+      <div className="w-full">
+        <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[480px]">
+          {/* IZQUIERDA: Bloque rojo con texto */}
+          <div className="bg-[#C22320] flex flex-col justify-center px-8 py-16 lg:py-24 min-h-[420px]">
+            <h1 className="text-4xl md:text-5xl font-black uppercase text-white mb-6 leading-tight">
+              Soluciones de <br />Calefacción
             </h1>
-            <p className="text-xl mb-8 text-blue-100">
-              Encuentra las mejores herramientas, accesorios y materiales para profesionales y particulares. Calidad
-              garantizada y envío rápido.
+            <p className="text-lg md:text-xl text-white mb-8 font-medium">
+              Ofrecemos productos y servicios para calefaccionar hogares, hoteles y más.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button size="lg" className="bg-yellow-500 hover:bg-yellow-600 text-black" asChild>
+            <div className="flex gap-4 flex-col sm:flex-row">
+              <Button
+                size="lg"
+                className="bg-[#FFD200] hover:bg-[#ffe244] text-[#C22320] font-bold text-base px-8 py-2 rounded-full shadow"
+                asChild
+              >
                 <Link href="/products">Ver Productos</Link>
               </Button>
               <Button
                 size="lg"
                 variant="outline"
-                className="border-white text-black hover:bg-white hover:text-blue-600"
+                className="border-2 border-white text-red-700 font-bold text-base px-8 py-2 rounded-full hover:bg-white hover:text-[#C22320] hover:border-[#C22320] shadow"
                 asChild
               >
                 <Link href="/categories">Explorar Categorías</Link>
               </Button>
             </div>
           </div>
-          <div className="relative">
+          {/* DERECHA: Bloque azul con imagen */}
+          <div className="bg-[#ffffff] flex items-center justify-center px-8 py-16 lg:py-24">
             <Image
-              src="/placeholder.svg?height=500&width=600"
-              alt="Herramientas de plomería"
-              width={600}
-              height={500}
-              className="rounded-lg shadow-2xl"
+              src="/logo-plasgas-sin-fondo.png"
+              alt="Calefón moderno"
+              width={350}
+              height={420}
+              priority
             />
           </div>
         </div>

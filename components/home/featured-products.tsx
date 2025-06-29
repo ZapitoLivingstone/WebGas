@@ -46,8 +46,8 @@ export function FeaturedProducts() {
 
   if (loading) {
     return (
-      <section className="py-16">
-        <div className="container mx-auto px-4">
+      <section className="py-16 bg-gray-50">
+        <div className="max-w-screen-xl mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold mb-4">Productos Destacados</h2>
             <p className="text-gray-600 max-w-2xl mx-auto">
@@ -68,12 +68,13 @@ export function FeaturedProducts() {
     )
   }
 
+  
   return (
-    <section className="py-16">
-      <div className="container mx-auto px-4">
+    <section className="py-16 bg-gray-50">
+      <div className="max-w-screen-xl mx-auto px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold mb-4">Productos Destacados</h2>
-          <p className="text-gray-600 max-w-2xl mx-auto">
+          <p className="text-gray-500 max-w-2xl mx-auto">
             Los productos más populares y mejor valorados por nuestros clientes
           </p>
         </div>
@@ -87,13 +88,13 @@ export function FeaturedProducts() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
               {products.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
             </div>
             <div className="text-center">
-              <Button asChild size="lg">
+              <Button asChild size="lg" className="rounded-xl bg-[#C22320] text-white hover:bg-[#a31916]">
                 <Link href="/products">Ver Todos los Productos</Link>
               </Button>
             </div>
