@@ -10,8 +10,6 @@ import {
   deleteCategory,
   getCategoryProductCount,
 } from "@/lib/categories"
-import { Header } from "@/components/layout/header"
-import { Footer } from "@/components/layout/footer"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -230,11 +228,9 @@ export default function CategoriesPage() {
   if (loading || isLoading) {
     return (
       <div className="min-h-screen flex flex-col">
-        <Header />
         <div className="flex-1 flex items-center justify-center">
           <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-600"></div>
         </div>
-        <Footer />
       </div>
     )
   }
@@ -246,7 +242,6 @@ export default function CategoriesPage() {
   // --- RENDER ---
   return (
     <div className="min-h-screen flex flex-col">
-      <Header />
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="max-w-5xl mx-auto">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-8">
@@ -341,7 +336,6 @@ export default function CategoriesPage() {
           </Card>
         </div>
       </main>
-      <Footer />
 
       {/* --- MODAL AGREGAR --- */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>

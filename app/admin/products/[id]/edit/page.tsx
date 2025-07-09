@@ -13,8 +13,6 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { Header } from "@/components/layout/header"
-import { Footer } from "@/components/layout/footer"
 import { useToast } from "@/hooks/use-toast"
 import { X, Plus, Loader2, Save } from "lucide-react"
 import { uploadImageToService } from "@/lib/image-upload"
@@ -278,11 +276,9 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
   if (loading || isLoading) {
     return (
       <div className="min-h-screen flex flex-col">
-        <Header />
         <div className="flex-1 flex items-center justify-center">
           <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-600"></div>
         </div>
-        <Footer />
       </div>
     )
   }
@@ -294,7 +290,6 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
   // Render the form
   return (
     <div className="min-h-screen flex flex-col">
-      <Header />
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center justify-between mb-8">
@@ -523,7 +518,6 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           </Card>
         </div>
       </main>
-      <Footer />
 
       {/* Modal de confirmación para desactivar producto */}
       <Dialog open={showDeactivateDialog} onOpenChange={setShowDeactivateDialog}>

@@ -3,12 +3,9 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/providers/auth-provider"
-import { Header } from "@/components/layout/header"
-import { Footer } from "@/components/layout/footer"
-import { Package, Users, ShoppingCart, TrendingUp } from "lucide-react"
+import { Package, Users, ShoppingCart, TrendingUp, ArrowRight } from "lucide-react"
 
 export default function AdminPage() {
   const { user, userRole, loading } = useAuth()
@@ -95,11 +92,9 @@ export default function AdminPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col">
-        <Header />
         <div className="flex-1 flex items-center justify-center">
           <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-600"></div>
         </div>
-        <Footer />
       </div>
     )
   }
@@ -110,66 +105,60 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-muted">
-      <Header />
-      <main className="flex-1 w-full max-w-full px-2 sm:px-4 py-6 sm:py-8 mx-auto">
+      <main className="flex-1 w-full max-w-full px-2 sm:px-4 py-8 mx-auto">
         {/* Responsive Header */}
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold">Panel de Administración</h1>
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-[#C22320]">Panel de Administración</h1>
           <Button
-            className="w-full sm:w-auto"
+            className="w-full sm:w-auto bg-[#C22320] hover:bg-[#a31916] text-white flex gap-2 items-center rounded-lg shadow-lg text-lg px-6 py-2"
             onClick={() => router.push("/admin/pos")}
           >
+            <ArrowRight className="w-5 h-5" />
             Ir al Punto de Venta
           </Button>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 gap-y-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-base font-medium">Total Productos</CardTitle>
-              <Package className="h-5 w-5 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl sm:text-2xl font-bold">{stats.totalProducts}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-base font-medium">Total Usuarios</CardTitle>
-              <Users className="h-5 w-5 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl sm:text-2xl font-bold">{stats.totalUsers}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-base font-medium">Total Pedidos</CardTitle>
-              <ShoppingCart className="h-5 w-5 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl sm:text-2xl font-bold">{stats.totalOrders}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-base font-medium">Ingresos Totales</CardTitle>
-              <TrendingUp className="h-5 w-5 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl sm:text-2xl font-bold">{formatPrice(stats.totalRevenue)}</div>
-            </CardContent>
-          </Card>
+        {/* Stats Cards mejorados */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+          <StatCard
+            title="Total Productos"
+            value={stats.totalProducts}
+            icon={<Package className="h-9 w-9 text-blue-500" />}
+            bg="from-blue-100 to-white"
+          />
+          <StatCard
+            title="Total Usuarios"
+            value={stats.totalUsers}
+            icon={<Users className="h-9 w-9 text-green-500" />}
+            bg="from-green-100 to-white"
+          />
+          <StatCard
+            title="Total Pedidos"
+            value={stats.totalOrders}
+            icon={<ShoppingCart className="h-9 w-9 text-yellow-500" />}
+            bg="from-yellow-100 to-white"
+          />
+          <StatCard
+            title="Ingresos Totales"
+            value={formatPrice(stats.totalRevenue)}
+            icon={<TrendingUp className="h-9 w-9 text-pink-500" />}
+            bg="from-pink-100 to-white"
+          />
         </div>
 
-        {/* Aquí puedes añadir tus tablas/listados con overflow-x-auto para que sean responsivos en móvil */}
-        {/* Ejemplo para el futuro: */}
-        {/* <div className="overflow-x-auto">
-              ...tu tabla aquí...
-            </div> */}
+        {/* Puedes agregar tablas/listas abajo, por ejemplo: */}
+        {/* <RecentOrdersTable orders={recentOrders} /> */}
       </main>
-      <Footer />
+    </div>
+  )
+}
+
+function StatCard({ title, value, icon, bg }: { title: string, value: any, icon: React.ReactNode, bg: string }) {
+  return (
+    <div className={`rounded-2xl shadow-md bg-gradient-to-br ${bg} px-7 py-7 flex flex-col items-center border border-gray-200 hover:shadow-xl transition-all duration-300`}>
+      <div className="mb-2">{icon}</div>
+      <span className="text-4xl font-bold mb-1">{value}</span>
+      <span className="text-base text-gray-600 font-medium">{title}</span>
     </div>
   )
 }

@@ -8,8 +8,6 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Header } from "@/components/layout/header"
-import { Footer } from "@/components/layout/footer"
 import { useToast } from "@/hooks/use-toast"
 import { Plus, Search, Edit, Trash2, Eye, Power } from "lucide-react"
 import {
@@ -180,11 +178,9 @@ export default function ProductsPage() {
   if (loading || isLoading) {
     return (
       <div className="min-h-screen flex flex-col">
-        <Header />
         <div className="flex-1 flex items-center justify-center">
           <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-600"></div>
         </div>
-        <Footer />
       </div>
     )
   }
@@ -195,7 +191,6 @@ export default function ProductsPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Header />
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold">Gestión de Productos</h1>
@@ -392,7 +387,6 @@ export default function ProductsPage() {
         )}
 
       </main>
-      <Footer />
 
       {/* Modal de confirmación para eliminar */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
