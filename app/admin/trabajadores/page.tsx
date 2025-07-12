@@ -24,9 +24,8 @@ export default function TrabajadoresPage() {
 
   const fetchTrabajadores = async () => {
     const { data, error } = await supabase
-      .from("usuarios")
+      .rpc("admin_listar_trabajadores")
       .select("id, nombre, email, telefono, direccion, creado_en")
-      .eq("rol", "trabajador")
       .order("creado_en", { ascending: false })
     setTrabajadores(data || [])
   }
@@ -82,14 +81,22 @@ export default function TrabajadoresPage() {
               trabajadoresFiltrados.map((t) => (
                 <tr key={t.id} className="border-b hover:bg-blue-50/40 transition">
                   <td className="px-4 py-3">{t.nombre}</td>
-                  <td className="px-4 py-3 flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-gray-400" /> {t.email}
+                  <td className="px-4 py-3">
+                    <span className="inline-flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-gray-400" /> {t.email}
+                    </span>
                   </td>
-                  <td className="px-4 py-3 flex items-center gap-2">
-                    <Phone className="w-4 h-4 text-gray-400" /> {t.telefono || <span className="text-gray-300">Sin teléfono</span>}
+                  <td className="px-4 py-3">
+                    <span className="inline-flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-gray-400" />
+                      {t.telefono ? t.telefono : <span className="text-gray-300">Sin teléfono</span>}
+                    </span>
                   </td>
-                  <td className="px-4 py-3 flex items-center gap-2">
-                    <Home className="w-4 h-4 text-gray-400" /> {t.direccion || <span className="text-gray-300">Sin dirección</span>}
+                  <td className="px-4 py-3">
+                    <span className="inline-flex items-center gap-2">
+                      <Home className="w-4 h-4 text-gray-400" />
+                      {t.direccion ? t.direccion : <span className="text-gray-300">Sin dirección</span>}
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-500">
                     {t.creado_en ? new Date(t.creado_en).toLocaleDateString("es-CL") : "-"}
@@ -98,6 +105,7 @@ export default function TrabajadoresPage() {
               ))
             )}
           </tbody>
+
         </table>
       </div>
     </div>

@@ -215,17 +215,24 @@ export function Header() {
                     <DropdownMenuItem asChild>
                       <Link href="/orders">Mis Pedidos</Link>
                     </DropdownMenuItem>
-                    {userRole === "admin" && (
+                    {(userRole === "admin" || userRole === "trabajador") && (
                       <>
+                        {userRole === "admin" && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem asChild>
+                              <Link href="/admin">Panel Admin</Link>
+                            </DropdownMenuItem>
+                          </>
+                        )}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem asChild>
-                          <Link href="/admin">Panel Admin</Link>
-                        </DropdownMenuItem>
                         <DropdownMenuItem asChild>
                           <Link href="/admin/pos">Punto de Venta</Link>
                         </DropdownMenuItem>
                       </>
                     )}
+
+
                     {userRole === "distribuidor" && (
                       <>
                         <DropdownMenuSeparator />
