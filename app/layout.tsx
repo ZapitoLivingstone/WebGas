@@ -10,6 +10,8 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "PlasGas",
   description: "Junto a ti en cada estación del año",
+  icons: {
+    icon: "/logo-plasgas-sin-fondo-pequeña.png",}
 }
 
 export default function RootLayout({
