@@ -8,8 +8,8 @@ import { Toaster } from "@/components/ui/toaster"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Gásfiter Pro - Tu tienda de plomería online",
-  description: "Encuentra todo lo que necesitas para tus proyectos de plomería y gasfitería",
+  title: "PlasGas",
+  description: "Junto a ti en cada estación del año",
 }
 
 export default function RootLayout({

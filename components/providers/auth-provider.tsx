@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react"
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react"
 import type { User } from "@supabase/supabase-js"
 import { supabase } from "@/lib/supabase"
 
@@ -27,8 +27,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userRole, setUserRole] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [initialLoading, setInitialLoading] = useState(true)
-  const lastUserId = useRef<string | null>(null)
-  const alreadyRefreshing = useRef(false)
 
   const fetchUserRole = useCallback(async (userId: string) => {
     try {
@@ -49,60 +47,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const refreshAuth = useCallback(async () => {
-    if (alreadyRefreshing.current) {
-      console.log("[Auth] Ya refrescando, ignora nueva llamada")
-      return
-    }
-    alreadyRefreshing.current = true
     setLoading(true)
     try {
-      console.log("[Auth] Llamando supabase.auth.getSession()")
-      const { data: { session }, error } = await supabase.auth.getSession()
-      if (error) {
-        console.warn("[Auth] Error en getSession:", error)
-      }
+      const { data: { session } } = await supabase.auth.getSession()
       const currentUser = session?.user ?? null
-      console.log("[Auth] Estado de sesión:", session, currentUser)
       if (!currentUser) {
         setUser(null)
         setUserRole(null)
-        lastUserId.current = null
-        setLoading(false)
-        setInitialLoading(false)
-        alreadyRefreshing.current = false
-        return
-      }
-
-      setUser(currentUser)
-      if (lastUserId.current !== currentUser.id) {
+      } else {
+        setUser(currentUser)
+        // **Siempre** consulta el rol, aunque el id no cambie
         const role = await fetchUserRole(currentUser.id)
         setUserRole(role)
-        lastUserId.current = currentUser.id
-        console.log("[Auth] Usuario y rol seteados:", currentUser.email, role)
-      } else {
-        console.log("[Auth] Mismo usuario, no refresca rol")
       }
     } catch (e) {
       setUser(null)
       setUserRole(null)
-      lastUserId.current = null
       console.error("[Auth] Error general en refreshAuth:", e)
     } finally {
       setLoading(false)
       setInitialLoading(false)
-      alreadyRefreshing.current = false
     }
   }, [fetchUserRole])
 
   useEffect(() => {
-    console.log("[Auth] useEffect: monta y llama refreshAuth")
     refreshAuth()
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("[Auth] Evento onAuthStateChange:", event, session)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
       refreshAuth()
     })
     return () => {
-      console.log("[Auth] Cleanup: unsubscribe onAuthStateChange")
       subscription.unsubscribe()
     }
   }, [refreshAuth])
@@ -114,11 +87,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     setLoading(true)
     try {
-      console.log("[Auth] signOut llamado")
       await supabase.auth.signOut()
       setUser(null)
       setUserRole(null)
-      lastUserId.current = null
       window.location.href = "/"
     } catch (error) {
       console.error("[Auth] Error durante signOut:", error)
