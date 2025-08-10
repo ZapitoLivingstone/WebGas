@@ -4,6 +4,8 @@ import { HeroSection } from "@/components/home/hero-section"
 import { FeaturedProducts } from "@/components/home/featured-products"
 import { CategoriesSection } from "@/components/home/categories-section"
 import { ConfigurationWarning } from "@/components/configuration-warning"
+import SpecialServicesSection from "@/components/home/SpecialServicesSection";
+
 
 export default function HomePage() {
   return (
@@ -14,6 +16,7 @@ export default function HomePage() {
         <HeroSection />
         <CategoriesSection />
         <FeaturedProducts />
+        <SpecialServicesSection/>
       </main>
       <Footer />
     </div>

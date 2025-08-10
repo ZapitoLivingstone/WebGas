@@ -136,11 +136,11 @@ export function Header() {
                       </DropdownMenuItem>
                     </>
                   )}
-                  {userRole === "distribuidor" && (
+                  {userRole === "trabajador" && (
                     <>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem asChild>
-                        <Link href="/distributor">Panel Distribuidor</Link>
+                        <Link href="/admin/pos">Punto de Venta</Link>
                       </DropdownMenuItem>
                     </>
                   )}
