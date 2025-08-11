@@ -1,4 +1,5 @@
 export interface Product {
+  [x: string]: any
   id: number
   nombre: string
   precio: number

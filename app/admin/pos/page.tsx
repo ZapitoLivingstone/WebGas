@@ -3,7 +3,13 @@
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
-  Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
@@ -22,9 +28,11 @@ import type { Product, Categoria, CartItem } from "@/lib/types"
 export default function POSVentasPage() {
   const { user, userRole } = useAuth()
   const { toast } = useToast()
+
   // Productos/categorías
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Categoria[]>([])
+
   // Carrito y venta
   const [cart, setCart] = useState<CartItem[]>([])
   const [searchTerm, setSearchTerm] = useState("")
@@ -44,29 +52,97 @@ export default function POSVentasPage() {
   const [resumenModal, setResumenModal] = useState(false)
   const [resumenVentas, setResumenVentas] = useState<any>(null)
 
-  // Fetch initial data + turno abierto
+  // Carga inicial + turno
   useEffect(() => {
     if (!["admin", "trabajador"].includes(userRole ?? "")) {
-      toast({ title: "Acceso denegado", description: "No tienes permisos para acceder al POS", variant: "destructive" })
+      toast({
+        title: "Acceso denegado",
+        description: "No tienes permisos para acceder al POS",
+        variant: "destructive",
+      })
       return
     }
     fetchData()
     fetchTurnoAbierto()
-    // eslint-disable-next-line
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userRole, user?.id])
+
+  // Realtime: escuchar cambios de stock en productos
+  useEffect(() => {
+    if (!["admin", "trabajador"].includes(userRole ?? "")) return
+
+    const channel = supabase
+      .channel("pos-stock")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "productos" },
+        (payload) => {
+          const row = payload.new as any
+          // Opcional: filtrar solo tipo 'propio'
+          // if ((row?.tipo ?? "").toLowerCase() !== "propio") return
+
+          setProducts((prev) =>
+            prev.map((p) =>
+              p.id === row.id
+                ? {
+                    ...p,
+                    stock: row.stock,
+                    // Si cambian otros campos relevantes:
+                    precio: row.precio ?? p.precio,
+                    activo: row.activo ?? p.activo,
+                  }
+                : p
+            )
+          )
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [userRole])
+
+  // Polling de respaldo cada 30s
+  useEffect(() => {
+    if (!["admin", "trabajador"].includes(userRole ?? "")) return
+    const id = setInterval(() => {
+      fetchData()
+    }, 30000) // 30s
+    return () => clearInterval(id)
+  }, [userRole])
 
   // 1. Productos/Categorías
   const fetchData = async () => {
     setLoading(true)
-    const { data: productosData } = await supabase.from("productos").select("*, categorias(nombre)").eq("activo", true).eq("tipo", "propio")
-    const { data: categoriasData } = await supabase.from("categorias").select("id, nombre").order("nombre")
-    const productos: Product[] = (productosData || []).map((p: any) => ({
-      ...p,
-      categoria_nombre: typeof p.categorias?.nombre === "string" ? p.categorias.nombre : undefined
-    })).map((p: Product) => ({
-      ...p,
-      categoria_nombre: p.categoria_nombre === null ? undefined : p.categoria_nombre
-    }))
+    const { data: productosData, error: prodErr } = await supabase
+      .from("productos")
+      .select("*, categorias(nombre)")
+      .eq("activo", true)
+      .eq("tipo", "propio")
+
+    const { data: categoriasData, error: catErr } = await supabase
+      .from("categorias")
+      .select("id, nombre")
+      .order("nombre")
+
+    if (prodErr) {
+      console.error("[productos.select] error:", prodErr)
+    }
+    if (catErr) {
+      console.error("[categorias.select] error:", catErr)
+    }
+
+    const productos: Product[] = (productosData || [])
+      .map((p: any) => ({
+        ...p,
+        categoria_nombre: typeof p.categorias?.nombre === "string" ? p.categorias.nombre : undefined,
+      }))
+      .map((p: Product) => ({
+        ...p,
+        categoria_nombre: p.categoria_nombre === null ? undefined : p.categoria_nombre,
+      }))
+
     setProducts(productos)
     setCategories(categoriasData || [])
     setLoading(false)
@@ -75,18 +151,16 @@ export default function POSVentasPage() {
   // 2. Estado turno de caja
   const fetchTurnoAbierto = async () => {
     if (!user) return
-    // Un solo turno abierto por usuario
-    const { data, error } = await supabase.from("turnos_caja")
+    const { data, error } = await supabase
+      .from("turnos_caja")
       .select("*")
       .eq("usuario_id", user.id)
       .eq("abierto", true)
       .order("inicio", { ascending: false })
       .limit(1)
-      .maybeSingle() // si no hay, retorna null
+      .maybeSingle()
     setTurnoAbierto(data || null)
-    if (error) {
-      console.error("Error al consultar turno abierto:", error)
-    }
+    if (error) console.error("Error al consultar turno abierto:", error)
   }
 
   // 3. Abrir turno
@@ -97,15 +171,15 @@ export default function POSVentasPage() {
       setModalTurno(false)
       return
     }
-    const { error } = await supabase
-      .from("turnos_caja")
-      .insert([{
+    const { error } = await supabase.from("turnos_caja").insert([
+      {
         usuario_id: user.id,
         usuario_email: user.email,
         inicio: new Date().toISOString(),
         efectivo_inicial: Number(efectivoInicial),
         abierto: true,
-      }])
+      },
+    ])
     if (error) {
       toast({ title: "Error al iniciar turno", variant: "destructive" })
       return
@@ -118,81 +192,76 @@ export default function POSVentasPage() {
 
   // 4. Cerrar turno
   const handleTerminarTurno = async () => {
-  if (!user || !turnoAbierto) return
+    if (!user || !turnoAbierto) return
 
-  const { data: ventas } = await supabase
-    .from("ventas_pos")
-    .select("*")
-    .gte("fecha", turnoAbierto.inicio)
-    .eq("admin_id", user.id)
+    const { data: ventas } = await supabase
+      .from("ventas_pos")
+      .select("*")
+      .gte("fecha", turnoAbierto.inicio)
+      .eq("admin_id", user.id)
 
-  const resumen = {
-    efectivo: 0,
-    debito: 0,
-    credito: 0,
-    transferencia: 0,
-    total: 0,
-    ventas: [] as any[]
-  }
-
-  for (const venta of ventas || []) {
-    resumen.ventas.push(venta)
-    resumen.total += venta.total_final
-
-    switch (venta.metodo_pago) {
-      case "efectivo":
-        resumen.efectivo += venta.total_final
-        break
-      case "tarjeta_debito":
-        resumen.debito += venta.total_final
-        break
-      case "tarjeta_credito":
-        resumen.credito += venta.total_final
-        break
-      case "transferencia":
-        resumen.transferencia += venta.total_final
-        break
+    const resumen = {
+      efectivo: 0,
+      debito: 0,
+      credito: 0,
+      transferencia: 0,
+      total: 0,
+      ventas: [] as any[],
     }
+
+    for (const venta of ventas || []) {
+      resumen.ventas.push(venta)
+      resumen.total += venta.total_final
+      switch (venta.metodo_pago) {
+        case "efectivo":
+          resumen.efectivo += venta.total_final
+          break
+        case "tarjeta_debito":
+          resumen.debito += venta.total_final
+          break
+        case "tarjeta_credito":
+          resumen.credito += venta.total_final
+          break
+        case "transferencia":
+          resumen.transferencia += venta.total_final
+          break
+      }
+    }
+
+    setResumenVentas(resumen)
+    setResumenModal(true)
   }
-
-  setResumenVentas(resumen)
-  setResumenModal(true)
-}
-
-
 
   // 5. Confirmar cierre de turno
   const handleConfirmarCierre = async () => {
-  if (!turnoAbierto || !resumenVentas) return
+    if (!turnoAbierto || !resumenVentas) return
 
-  const efectivoInicial = parseFloat(turnoAbierto.efectivo_inicial) || 0
-  const efectivoVentas = parseFloat(resumenVentas.efectivo ) || 0
-  const efectivoFinal = efectivoInicial + efectivoVentas
+    const efectivoInicialNum = parseFloat(turnoAbierto.efectivo_inicial) || 0
+    const efectivoVentas = parseFloat(resumenVentas.efectivo) || 0
+    const efectivoFinal = efectivoInicialNum + efectivoVentas
 
-  const { error } = await supabase
-    .from("turnos_caja")
-    .update({
-      fin: new Date().toISOString(),
-      efectivo_final: efectivoFinal,
-      abierto: false
-    })
-    .eq("id", turnoAbierto.id)
+    const { error } = await supabase
+      .from("turnos_caja")
+      .update({
+        fin: new Date().toISOString(),
+        efectivo_final: efectivoFinal,
+        abierto: false,
+      })
+      .eq("id", turnoAbierto.id)
 
-  if (error) {
-    toast({ title: "Error al cerrar turno", variant: "destructive" })
-    return
+    if (error) {
+      toast({ title: "Error al cerrar turno", variant: "destructive" })
+      return
+    }
+
+    toast({ title: "Turno cerrado correctamente" })
+    setResumenModal(false)
+    setTurnoAbierto(null)
+    setResumenVentas(null)
+    fetchTurnoAbierto()
   }
 
-  toast({ title: "Turno cerrado correctamente" })
-  setResumenModal(false)
-  setTurnoAbierto(null)
-  setResumenVentas(null)
-  fetchTurnoAbierto()
-}
-
-
-
-  // 6. Flujo de ventas (solo si turno abierto)
+  // 6. Flujo de ventas
   const addToCart = (product: Product) => {
     if (!turnoAbierto) {
       toast({ title: "Debes iniciar un turno antes de vender", variant: "destructive" })
@@ -204,8 +273,14 @@ export default function POSVentasPage() {
         toast({ title: "Stock insuficiente", variant: "destructive" })
         return
       }
-      setCart(cart.map((item) => item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item))
-    } else setCart([...cart, { product, quantity: 1 }])
+      setCart(
+        cart.map((item) =>
+          item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+        )
+      )
+    } else {
+      setCart([...cart, { product, quantity: 1 }])
+    }
   }
 
   const updateQuantity = (id: number, qty: number) => {
@@ -215,7 +290,7 @@ export default function POSVentasPage() {
       toast({ title: "Stock insuficiente", variant: "destructive" })
       return
     }
-    setCart(cart.map((item) => item.product.id === id ? { ...item, quantity: qty } : item))
+    setCart(cart.map((item) => (item.product.id === id ? { ...item, quantity: qty } : item)))
   }
 
   const getTotalBruto = () => cart.reduce((t, i) => t + i.product.precio * i.quantity, 0)
@@ -232,14 +307,17 @@ export default function POSVentasPage() {
   const vuelto = paymentMethod === "efectivo" ? (parseInt(efectivoIngresado) || 0) - getTotalFinal() : 0
 
   function normalize(str?: string | null) {
-    return (str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim()
+    return (str || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim()
   }
-  const formatPrice = (n: number) => new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP" }).format(n)
+  const formatPrice = (n: number) =>
+    new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP" }).format(n)
+
   const filtered = products
-    .map((p) => ({
-      ...p,
-      categoria_nombre: p.categoria_nombre === null ? undefined : p.categoria_nombre
-    }))
+    .map((p) => ({ ...p, categoria_nombre: p.categoria_nombre === null ? undefined : p.categoria_nombre }))
     .filter((p) => {
       const nombre = normalize(p.nombre)
       const categoria = normalize(p.categoria_nombre)
@@ -252,52 +330,128 @@ export default function POSVentasPage() {
   const processOrder = async () => {
     setShowConfirmModal(false)
     if (!user || cart.length === 0 || !paymentMethod) {
-      toast({ title: "Campos requeridos", variant: "destructive" })
-      return
-    }
-    setProcessingOrder(true)
-    const { data: venta, error } = await supabase
-      .from("ventas_pos")
-      .insert({
-        admin_id: user.id,
-        metodo_pago: paymentMethod,
-        total_bruto: getTotalBruto(),
-        descuento_total: getDescuentoValor(),
-        total_final: getTotalFinal(),
+      toast({
+        title: "Campos requeridos",
+        description: "Selecciona método de pago y agrega productos.",
+        variant: "destructive",
       })
-      .select()
-      .single()
-    if (error || !venta) {
-      toast({ title: "Error al guardar venta", variant: "destructive" })
-      setProcessingOrder(false)
       return
     }
-    const detalles = cart.map((i) => ({
-      venta_id: venta.id,
-      producto_id: i.product.id,
-      cantidad: i.quantity,
-      precio_unitario: i.product.precio,
-      subtotal: i.product.precio * i.quantity,
-    }))
-    const { error: detError } = await supabase.from("detalle_ventas_pos").insert(detalles)
-    if (detError) {
-      toast({ title: "Error al guardar detalles", variant: "destructive" })
-      setProcessingOrder(false)
-      return
-    }
-    for (const item of cart) {
-      if (item.product.tipo === "propio" && item.product.stock !== null) {
-        await supabase.from("productos").update({ stock: item.product.stock - item.quantity }).eq("id", item.product.id)
+
+    setProcessingOrder(true)
+    try {
+      // 1) Insertar venta POS (cabecera)
+      const totalBruto = getTotalBruto()
+      const descuento = getDescuentoValor()
+
+      const { data: venta, error: ventaErr } = await supabase
+        .from("ventas_pos")
+        .insert({
+          admin_id: user.id,
+          metodo_pago: paymentMethod,
+          total_bruto: totalBruto,
+          descuento_total: descuento,
+          total_final: totalBruto - descuento,
+          fecha: new Date().toISOString(),
+        })
+        .select()
+        .single()
+
+      if (ventaErr || !venta) {
+        console.error("[ventas_pos.insert] error:", ventaErr)
+        toast({ title: "Error al guardar venta", variant: "destructive" })
+        setProcessingOrder(false)
+        return
       }
+
+      // 2) Insertar detalles
+      const detalles = cart.map((i) => ({
+        venta_id: venta.id,
+        producto_id: i.product.id,
+        cantidad: i.quantity,
+        precio_unitario: i.product.precio,
+        subtotal: i.product.precio * i.quantity,
+      }))
+      const { error: detErr } = await supabase.from("detalle_ventas_pos").insert(detalles)
+      if (detErr) {
+        console.error("[detalle_ventas_pos.insert] error:", detErr)
+        toast({ title: "Error al guardar detalles", variant: "destructive" })
+        setProcessingOrder(false)
+        return
+      }
+
+      // 3) Descontar stock desde el front: leer y restar (uno por uno)
+      for (const item of cart) {
+        if ((item.product.tipo ?? "").toLowerCase() !== "propio") continue
+
+        // Lee stock actual
+        const { data: prod, error: prodErr } = await supabase
+          .from("productos")
+          .select("id, stock")
+          .eq("id", item.product.id)
+          .maybeSingle()
+
+        if (prodErr) {
+          console.error(`[productos.select] id=${item.product.id}`, prodErr)
+          toast({
+            title: "No se pudo leer stock de un producto",
+            description: `ID ${item.product.id}`,
+            variant: "destructive",
+          })
+          continue
+        }
+
+        const current = Number(prod?.stock ?? 0)
+        const after = current - item.quantity
+        if (after < 0) {
+          console.warn(
+            `Stock insuficiente para producto ${item.product.id}. Actual=${current}, solicitado=${item.quantity}`
+          )
+          toast({
+            title: "Stock insuficiente al descontar",
+            description: `Producto ID ${item.product.id}`,
+            variant: "destructive",
+          })
+          continue
+        }
+
+        const { error: updErr } = await supabase
+          .from("productos")
+          .update({ stock: after })
+          .eq("id", item.product.id)
+
+        if (updErr) {
+          console.error(`[productos.update] id=${item.product.id}`, updErr)
+          toast({
+            title: "No se pudo actualizar stock",
+            description: `Producto ID ${item.product.id}`,
+            variant: "destructive",
+          })
+        } else {
+          // Actualización optimista local (se verá al tiro)
+          setProducts((prev) =>
+            prev.map((p) => (p.id === item.product.id ? { ...p, stock: after } : p))
+          )
+        }
+      }
+
+      toast({ title: "Venta registrada correctamente" })
+
+      // Limpia UI
+      setCart([])
+      setPaymentMethod("")
+      setEfectivoIngresado("")
+      setDescuentoGlobal("")
+      setShowDescuentoInput(false)
+
+      // Refetch como respaldo
+      await fetchData()
+    } catch (e: any) {
+      console.error("[processOrder] error:", e)
+      toast({ title: "Error inesperado", description: "Intenta nuevamente.", variant: "destructive" })
+    } finally {
+      setProcessingOrder(false)
     }
-    toast({ title: "Venta registrada correctamente" })
-    setCart([])
-    setPaymentMethod("")
-    setEfectivoIngresado("")
-    setDescuentoGlobal("")
-    setShowDescuentoInput(false)
-    fetchData()
-    setProcessingOrder(false)
   }
 
   if (!["admin", "trabajador"].includes(userRole ?? "")) {
@@ -342,12 +496,7 @@ export default function POSVentasPage() {
           setSelectedCategory={setSelectedCategory}
         />
         <main className="lg:w-3/5 w-full">
-          <POSProductGrid
-            products={filtered}
-            loading={loading}
-            addToCart={addToCart}
-            formatPrice={formatPrice}
-          />
+          <POSProductGrid products={filtered} loading={loading} addToCart={addToCart} formatPrice={formatPrice} />
         </main>
         <section className="lg:w-1/5 w-full flex flex-col space-y-4">
           <POSCartPanel
@@ -368,6 +517,7 @@ export default function POSVentasPage() {
             vuelto={vuelto}
             formatPrice={formatPrice}
           />
+
           {/* Confirmar venta */}
           <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
             <DialogTrigger asChild>
@@ -380,14 +530,17 @@ export default function POSVentasPage() {
                 {processingOrder ? "Procesando..." : "Registrar Venta"}
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent aria-describedby="pos-confirm-desc">
               <DialogHeader>
                 <DialogTitle>¿Confirmar venta?</DialogTitle>
+                <DialogDescription id="pos-confirm-desc">
+                  Revisa el total y el método de pago antes de confirmar.
+                </DialogDescription>
               </DialogHeader>
               <p>Total a pagar: {formatPrice(getTotalFinal())}</p>
               {paymentMethod === "efectivo" && (
                 <p>
-                  Efectivo ingresado: {formatPrice(parseInt(efectivoIngresado) || 0)} - Vuelto:{" "}
+                  Efectivo ingresado: {formatPrice(parseInt(efectivoIngresado) || 0)} — Vuelto:{" "}
                   {formatPrice(vuelto)}
                 </p>
               )}
