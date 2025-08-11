@@ -17,11 +17,17 @@ const adminTabs = [
 
 export function AdminHeader() {
   const pathname = usePathname()
-  const { user, signOut } = useAuth()
+  // 👇 usa userRole en vez de user?.role
+  const { user, userRole, signOut, loading } = useAuth()
   const [open, setOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
 
-  // Cierra el menú al hacer click fuera de él
+  // Evita “flash” de rol mientras carga
+  const role = (userRole ?? "").toLowerCase()
+  const isAdmin = role === "admin"
+  const isWorker = role === "trabajador"
+
+  // Cierra el menú al hacer click fuera
   useEffect(() => {
     if (!open) return
     function handleClickOutside(event: MouseEvent) {
@@ -37,10 +43,6 @@ export function AdminHeader() {
   useEffect(() => {
     setOpen(false)
   }, [pathname])
-
-  // Función para determinar si el usuario es admin o trabajador
-  const isAdmin = user?.role === "admin"
-  const isWorker = user?.role === "trabajador"
 
   return (
     <header className="w-full bg-white border-b shadow-md sticky top-0 z-40">
@@ -59,7 +61,7 @@ export function AdminHeader() {
             </span>
           </div>
 
-          {/* Tabs desktop (solo para admin) */}
+          {/* Tabs desktop (solo admin) */}
           {isAdmin && (
             <ul className="hidden xl:flex gap-2 sm:gap-4 flex-1 ml-8">
               {adminTabs.map((tab) => (
@@ -69,11 +71,9 @@ export function AdminHeader() {
                     className={`
                       px-2 py-1 sm:px-4 sm:py-2 rounded-lg font-medium transition
                       text-sm sm:text-base
-                      ${
-                        pathname === tab.href
-                          ? "bg-[#C22320]/10 text-[#C22320] font-bold"
-                          : "text-gray-700 hover:bg-gray-100"
-                      }
+                      ${pathname === tab.href
+                        ? "bg-[#C22320]/10 text-[#C22320] font-bold"
+                        : "text-gray-700 hover:bg-gray-100"}
                     `}
                     aria-current={pathname === tab.href ? "page" : undefined}
                   >
@@ -84,9 +84,8 @@ export function AdminHeader() {
             </ul>
           )}
 
-          {/* User actions + Volver a tienda */}
+          {/* Acciones usuario + Volver */}
           <div className="flex items-center gap-2 ml-auto">
-            {/* Volver a tienda (desktop/XL) - para ambos roles */}
             <Link href="/" className="hidden xl:flex">
               <Button
                 variant="outline"
@@ -98,17 +97,20 @@ export function AdminHeader() {
                 Volver a tienda
               </Button>
             </Link>
-            <span className="hidden sm:block text-gray-600 text-sm font-semibold">{user?.email}</span>
+            <span className="hidden sm:block text-gray-600 text-sm font-semibold">
+              {user?.email}
+            </span>
             <Button
               variant="ghost"
               size="icon"
               aria-label="Cerrar sesión"
               onClick={signOut}
               className="hover:bg-[#C22320]/10 text-[#C22320] transition"
+              disabled={loading}
             >
               <LogOut className="w-5 h-5" />
             </Button>
-            {/* Mobile menu button - visible en LG y menor */}
+            {/* Mobile menu button */}
             <button
               className="xl:hidden ml-2 p-2 rounded-lg hover:bg-gray-100 transition"
               aria-label="Abrir menú"
@@ -136,14 +138,14 @@ export function AdminHeader() {
                   <X className="w-6 h-6 text-[#C22320]" />
                 </button>
               </div>
-              {/* Botón Volver a tienda en mobile - ambos roles */}
+
               <Link href="/" onClick={() => setOpen(false)}>
                 <div className="flex items-center px-6 py-3 gap-2 font-medium border-b text-gray-700 hover:bg-gray-100">
                   <Home className="w-5 h-5" />
                   Volver a tienda
                 </div>
               </Link>
-              {/* Mostrar tabs solo si es admin */}
+
               {isAdmin &&
                 adminTabs.map((tab) => (
                   <Link
@@ -151,11 +153,9 @@ export function AdminHeader() {
                     href={tab.href}
                     className={`
                       px-6 py-3 text-base border-b font-medium
-                      ${
-                        pathname === tab.href
-                          ? "bg-[#C22320]/10 text-[#C22320] font-bold"
-                          : "text-gray-700 hover:bg-gray-100"
-                      }
+                      ${pathname === tab.href
+                        ? "bg-[#C22320]/10 text-[#C22320] font-bold"
+                        : "text-gray-700 hover:bg-gray-100"}
                     `}
                     aria-current={pathname === tab.href ? "page" : undefined}
                     onClick={() => setOpen(false)}
@@ -163,7 +163,10 @@ export function AdminHeader() {
                     {tab.label}
                   </Link>
                 ))}
-              <span className="px-6 py-3 text-xs text-gray-500">{user?.email}</span>
+
+              <span className="px-6 py-3 text-xs text-gray-500">
+                {user?.email}
+              </span>
             </div>
           )}
         </nav>
